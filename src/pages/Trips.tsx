@@ -1,24 +1,27 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { tripsService, usersService } from "@/services";
+import { tripsService } from "@/services";
 import type { Trip, User } from "@/lib/types";
 import { TripCard } from "@/components/TripCard";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { Mail, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Trips() {
   const [trips, setTrips] = useState<Trip[] | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    Promise.all([tripsService.list(), usersService.list()]).then(([t, u]) => {
-      setTrips(t);
-      setUsers(u);
-    });
+    tripsService
+      .list()
+      .then(setTrips)
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Erro ao carregar viagens");
+        setTrips([]);
+      });
   }, []);
 
-  const memberObjs = (t: Trip) => t.members.map((m) => users.find((u) => u.id === m.userId)).filter(Boolean) as User[];
+  const memberObjs = (t: Trip) => t.members.map((m) => m.profile).filter(Boolean) as User[];
 
   return (
     <div className="container max-w-6xl py-8 space-y-8">

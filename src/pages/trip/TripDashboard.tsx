@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { expensesService, feedService, flightsService, itineraryService, packingService, staysService, tripsService, usersService } from "@/services";
+import { expensesService, feedService, flightsService, itineraryService, packingService, staysService, tripsService } from "@/services";
 import type { ActivityFeedItem, Expense, Flight, PackingItem, ScheduledActivity, Stay, Trip, User } from "@/lib/types";
 import { GradientHero } from "@/components/GradientHero";
 import { TravelerAvatarGroup } from "@/components/TravelerAvatarGroup";
@@ -22,11 +22,10 @@ export default function TripDashboard() {
 
   useEffect(() => {
     if (!id) return;
-    tripsService.get(id).then(async (t) => {
+    tripsService.get(id).then((t) => {
       if (!t) return;
       setTrip(t);
-      const us = await Promise.all(t.members.map((m) => usersService.get(m.userId)));
-      setMembers(us.filter(Boolean) as User[]);
+      setMembers(t.members.map((m) => m.profile).filter(Boolean) as User[]);
     });
     flightsService.byTrip(id).then(setFlights);
     staysService.byTrip(id).then(setStays);
