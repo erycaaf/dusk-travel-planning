@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { authService } from "@/services";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Intro from "./pages/auth/Intro";
@@ -26,12 +28,47 @@ import Sobre from "./pages/Sobre";
 
 const queryClient = new QueryClient();
 
+/**
+ * Listens to Supabase auth state and redirects on sign-in / sign-out.
+ * Must live inside <BrowserRouter> so it can use useNavigate.
+ */
+function AuthWatcher() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const subscription = authService.onAuthStateChange((userId) => {
+      if (userId) {
+        // User just signed in (magic link callback). If we're still on an auth page, move on.
+        const onAuthPage = ["/intro", "/splash", "/login", "/signup", "/forgot-password"].some((p) =>
+          location.pathname.startsWith(p),
+        );
+        if (onAuthPage || location.pathname === "/") {
+          navigate("/trips", { replace: true });
+        }
+      } else {
+        // User signed out — kick them back to splash.
+        const onProtectedPage = location.pathname.startsWith("/trips") ||
+          location.pathname.startsWith("/profile") ||
+          location.pathname.startsWith("/settings");
+        if (onProtectedPage) {
+          navigate("/splash", { replace: true });
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate, location.pathname]);
+
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <AuthWatcher />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/intro" element={<Intro />} />

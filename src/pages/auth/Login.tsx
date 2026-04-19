@@ -1,47 +1,80 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "./AuthLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authService } from "@/services";
 import { toast } from "sonner";
+import { Mail, ArrowLeft } from "lucide-react";
 
 export default function Login() {
-  const nav = useNavigate();
-  const [email, setEmail] = useState("eryca@dusk.app");
-  const [pw, setPw] = useState("dusk");
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await authService.signIn(email, pw);
+    const { error } = await authService.signInWithMagicLink(email);
     setLoading(false);
-    toast.success("Bem-vinda de volta ✨");
-    nav("/trips", { replace: true });
+
+    if (error) {
+      toast.error(`Não foi possível enviar o link: ${error.message}`);
+      return;
+    }
+    setSent(true);
   };
+
+  if (sent) {
+    return (
+      <AuthLayout title="Olhe seu email" subtitle="Um link mágico está a caminho.">
+        <div className="space-y-6 text-center">
+          <div className="mx-auto w-16 h-16 rounded-full bg-sunset-soft flex items-center justify-center">
+            <Mail className="h-7 w-7 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-base">
+              Enviamos um link para <span className="font-semibold">{email}</span>.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Abra o email e clique no link para entrar. Não chegou em 1 minuto? Confira o spam.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => { setSent(false); setEmail(""); }}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" /> Usar outro email
+          </Button>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout title="Entrar no Dusk" subtitle="Sua próxima viagem está esperando.">
       <form onSubmit={submit} className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="voce@email.com"
+            required
+            autoComplete="email"
+            autoFocus
+          />
+          <p className="text-xs text-muted-foreground">
+            Enviaremos um link mágico para você entrar sem senha.
+          </p>
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="pw">Senha</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">Esqueci minha senha</Link>
-          </div>
-          <Input id="pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} required autoComplete="current-password" />
-        </div>
-        <Button type="submit" variant="sunset" size="lg" className="w-full" disabled={loading}>
-          {loading ? "Entrando..." : "Entrar"}
+        <Button type="submit" variant="sunset" size="lg" className="w-full" disabled={loading || !email}>
+          {loading ? "Enviando..." : "Receber link mágico"}
         </Button>
-        <p className="text-sm text-muted-foreground text-center">
-          Ainda não tem conta? <Link to="/signup" className="text-primary font-medium hover:underline">Criar conta</Link>
-        </p>
       </form>
     </AuthLayout>
   );

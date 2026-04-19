@@ -2,6 +2,8 @@
 
 export type UserRole = "owner" | "editor" | "viewer";
 
+export type Gender = "feminino" | "masculino" | "outro" | "prefiro_nao_dizer";
+
 export interface User {
   id: string;
   name: string;
@@ -10,6 +12,7 @@ export interface User {
   bio?: string;
   interests?: string[];
   pace?: "calm" | "balanced" | "intense";
+  gender?: Gender;
 }
 
 export type TripStatus = "planning" | "ongoing" | "done";
@@ -18,6 +21,8 @@ export type TripStyle = "relaxada" | "intensa" | "gastronomica" | "cultural" | "
 export interface TripMember {
   userId: string;
   role: UserRole;
+  /** Populated when the trip is loaded with a profiles join. */
+  profile?: User;
 }
 
 export interface Trip {
