@@ -321,9 +321,117 @@ export default function TravelInfo() {
       )}
 
       {tab === "terrestre" && (
-        <div className="rounded-2xl bg-card border border-border/50 p-8 text-center text-muted-foreground">
-          Nenhum transporte terrestre adicionado ainda.<br />
-          <Button variant="outline" className="mt-4"><Plus className="h-4 w-4" /> Adicionar transporte</Button>
+        <div className="space-y-4">
+          {grounds.length === 0 && !showGroundForm && (
+            <div className="rounded-2xl bg-card border border-border/50 p-8 text-center text-muted-foreground">
+              Nenhum transporte terrestre adicionado ainda.
+            </div>
+          )}
+
+          {grounds.map((g) => {
+            const meta = GROUND_META[g.type];
+            const Icon = meta.icon;
+            return (
+              <article key={g.id} className="rounded-2xl bg-card border border-border/50 shadow-card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-primary/10 text-primary p-2.5"><Icon className="h-5 w-5" /></div>
+                    <div>
+                      <p className="font-display font-semibold">{meta.label}</p>
+                      {g.bookingCode && <p className="text-xs text-muted-foreground">Reserva {g.bookingCode}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => removeGround(g.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1" aria-label="Remover transporte">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-4 py-2">
+                  <div className="text-center flex-1">
+                    <p className="font-display font-bold text-lg">{g.fromCity}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDate(g.departure)} · {fmtTime(g.departure)}</p>
+                  </div>
+                  <div className="flex-1 flex items-center gap-2 text-muted-foreground">
+                    <div className="h-px bg-border flex-1" /><Icon className="h-4 w-4" /><div className="h-px bg-border flex-1" />
+                  </div>
+                  <div className="text-center flex-1">
+                    <p className="font-display font-bold text-lg">{g.toCity}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDate(g.arrival)} · {fmtTime(g.arrival)}</p>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+
+          {showGroundForm && (
+            <div className="rounded-2xl bg-card border border-border/50 shadow-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="font-display font-semibold">Novo transporte</p>
+                <button onClick={() => { setShowGroundForm(false); setGroundForm(EMPTY_GROUND); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(GROUND_META) as GroundType[]).map((t) => {
+                    const M = GROUND_META[t];
+                    const Icon = M.icon;
+                    const active = groundForm.type === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setGroundForm((f) => ({ ...f, type: t }))}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium border transition-colors",
+                          active ? "bg-primary/15 text-primary border-primary/30" : "bg-card text-muted-foreground border-border hover:border-primary/40",
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" /> {M.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Origem</Label>
+                  <Input value={groundForm.fromCity} onChange={groundField("fromCity")} placeholder="Mendoza" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Destino</Label>
+                  <Input value={groundForm.toCity} onChange={groundField("toCity")} placeholder="Buenos Aires" />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Partida</Label>
+                  <Input type="datetime-local" value={groundForm.departure} onChange={groundField("departure")} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Chegada</Label>
+                  <Input type="datetime-local" value={groundForm.arrival} onChange={groundField("arrival")} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Código de reserva</Label>
+                <Input value={groundForm.bookingCode} onChange={groundField("bookingCode")} placeholder="opcional" />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setShowGroundForm(false); setGroundForm(EMPTY_GROUND); }}>Cancelar</Button>
+                <Button variant="sunset" onClick={saveGround} disabled={!canSaveGround}>Salvar transporte</Button>
+              </div>
+            </div>
+          )}
+
+          {!showGroundForm && (
+            <Button variant="outline" onClick={() => setShowGroundForm(true)}>
+              <Plus className="h-4 w-4" /> Adicionar transporte
+            </Button>
+          )}
         </div>
       )}
 
