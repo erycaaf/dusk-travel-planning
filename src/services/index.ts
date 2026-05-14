@@ -353,6 +353,7 @@ type StayRow = {
   check_out: string;
   booking_code: string;
   notes: string | null;
+  receipt_url: string | null;
 };
 
 const rowToStay = (r: StayRow): Stay => ({
@@ -364,6 +365,7 @@ const rowToStay = (r: StayRow): Stay => ({
   checkIn: r.check_in,
   checkOut: r.check_out,
   bookingCode: r.booking_code || undefined,
+  receiptUrl: r.receipt_url ?? undefined,
 });
 
 export const staysService = {
@@ -397,6 +399,14 @@ export const staysService = {
 
   remove: async (stayId: string): Promise<void> => {
     const { error } = await supabase.from("stays").delete().eq("id", stayId);
+    if (error) throw error;
+  },
+
+  updateReceipt: async (stayId: string, receiptUrl: string): Promise<void> => {
+    const { error } = await supabase
+      .from("stays")
+      .update({ receipt_url: receiptUrl })
+      .eq("id", stayId);
     if (error) throw error;
   },
 };
@@ -654,6 +664,40 @@ export const feedService = {
     const f: ActivityFeedItem = { ...item, id: id("fe") };
     store.feed = [f, ...store.feed];
     return wait(f);
+  },
+};
+
+// === Storage ===
+export const storageService = {
+  uploadCover: async (file: File): Promise<string> => {
+    if (!file.type.startsWith("image/")) throw new Error("Selecione um arquivo de imagem.");
+    if (file.size > 10 * 1024 * 1024) throw new Error("Imagem grande demais — limite de 10MB.");
+
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from("covers")
+      .upload(path, file, { contentType: file.type, cacheControl: "3600" });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from("covers").getPublicUrl(path);
+    return data.publicUrl;
+  },
+
+  uploadAttachment: async (file: File): Promise<string> => {
+    if (file.size > 20 * 1024 * 1024) throw new Error("Arquivo grande demais — limite de 20MB.");
+
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+    const path = `receipts/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from("covers")
+      .upload(path, file, { contentType: file.type, cacheControl: "3600" });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from("covers").getPublicUrl(path);
+    return data.publicUrl;
   },
 };
 

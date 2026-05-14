@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { coverGallery } from "@/lib/mock-data";
 import { cn, errorMessage } from "@/lib/utils";
-import { tripsService } from "@/services";
+import { tripsService, storageService } from "@/services";
 import { toast } from "sonner";
 import { Check, X, ChevronLeft, ChevronRight, Sparkles, Calendar as CalIcon, Users as UsersIcon, MapPin, ImagePlus } from "lucide-react";
 import type { TripStyle, UserRole } from "@/lib/types";
@@ -35,7 +35,7 @@ export default function NewTrip() {
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
   const [coverId, setCoverId] = useState<string>(coverGallery[0].id);
-  const [customCover, setCustomCover] = useState<{ url: string; label: string } | null>(null);
+  const [customCover, setCustomCover] = useState<{ url: string; label: string; file: File } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
@@ -66,7 +66,7 @@ export default function NewTrip() {
     const reader = new FileReader();
     reader.onload = () => {
       const url = reader.result as string;
-      setCustomCover({ url, label: file.name });
+      setCustomCover({ url, label: file.name, file });
       setCoverId("custom");
     };
     reader.readAsDataURL(file);
@@ -91,6 +91,11 @@ export default function NewTrip() {
   const submit = async () => {
     setCreating(true);
     try {
+      let coverUrl = cover.url;
+      if (coverId === "custom" && customCover?.file) {
+        coverUrl = await storageService.uploadCover(customCover.file);
+      }
+
       const trip = await tripsService.create({
         name,
         country,
@@ -98,7 +103,7 @@ export default function NewTrip() {
         originCity: origin,
         startDate: start,
         endDate: end,
-        coverUrl: cover.url,
+        coverUrl,
         status: "planning",
         styles,
       });

@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { staysService } from "@/services";
+import { staysService, storageService } from "@/services";
 import type { Stay, StayType } from "@/lib/types";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { MapPlaceholder } from "@/components/MapPlaceholder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MapPin, Plus, X, Trash2 } from "lucide-react";
+import { MapPin, Plus, X, Trash2, Paperclip, ExternalLink } from "lucide-react";
 import { cn, errorMessage } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -34,6 +34,28 @@ export default function StayPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const uploadTargetId = useRef<string | null>(null);
+
+  const handleReceiptPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadTargetId.current) return;
+    const stayId = uploadTargetId.current;
+    setUploadingFor(stayId);
+    try {
+      const url = await storageService.uploadAttachment(file);
+      await staysService.updateReceipt(stayId, url);
+      setStays((prev) => prev.map((s) => s.id === stayId ? { ...s, receiptUrl: url } : s));
+      toast.success("Comprovante anexado!");
+    } catch (err) {
+      toast.error(errorMessage(err, "Erro ao enviar comprovante"));
+    } finally {
+      setUploadingFor(null);
+      uploadTargetId.current = null;
+      e.target.value = "";
+    }
+  };
 
   const load = () => {
     if (!id) return;
@@ -165,6 +187,14 @@ export default function StayPage() {
         </div>
       )}
 
+      <input
+        ref={receiptInputRef}
+        type="file"
+        accept="image/*,.pdf"
+        className="hidden"
+        onChange={handleReceiptPick}
+      />
+
       {stays.map((s) => (
         <article key={s.id} className="rounded-2xl bg-card border border-border/50 shadow-card overflow-hidden">
           <div className="grid md:grid-cols-2">
@@ -188,6 +218,24 @@ export default function StayPage() {
                 </div>
               </div>
               {s.bookingCode && <p className="text-sm"><span className="text-muted-foreground">Reserva: </span><span className="font-mono">{s.bookingCode}</span></p>}
+              <div className="flex gap-2">
+                {s.receiptUrl ? (
+                  <a href={s.receiptUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm">
+                      <ExternalLink className="h-3.5 w-3.5" /> Ver comprovante
+                    </Button>
+                  </a>
+                ) : null}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingFor === s.id}
+                  onClick={() => { uploadTargetId.current = s.id; receiptInputRef.current?.click(); }}
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                  {uploadingFor === s.id ? "Enviando..." : s.receiptUrl ? "Trocar comprovante" : "Anexar comprovante"}
+                </Button>
+              </div>
             </div>
             <div className="p-6">
               <MapPlaceholder pins={[{ id: "stay", label: s.name, x: 50, y: 50, tone: "primary" }]} height={260} />

@@ -68,6 +68,7 @@ export interface Stay {
   checkOut: string;
   bookingCode?: string;
   contact?: string;
+  receiptUrl?: string;
 }
 
 export type ActivityCategory =
