@@ -38,6 +38,7 @@ export interface Trip {
   styles: TripStyle[];
   members: TripMember[];
   budget?: number; // BRL
+  notes?: string;
 }
 
 export interface Flight {

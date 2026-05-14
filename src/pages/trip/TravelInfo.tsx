@@ -71,13 +71,18 @@ export default function TravelInfo() {
   const [showGroundForm, setShowGroundForm] = useState(false);
   const [groundForm, setGroundForm] = useState(EMPTY_GROUND);
 
-  const notesKey = id ? `dusk:trip:${id}:notes` : "";
   const groundsKey = id ? `dusk:trip:${id}:grounds` : "";
 
   const load = () => {
     if (!id) return;
     flightsService.byTrip(id).then(setFlights).catch(() => {});
-    tripsService.get(id).then((t) => setTrip(t || null));
+    tripsService.get(id).then((t) => {
+      if (!t) return;
+      setTrip(t);
+      const n = t.notes ?? "";
+      setNotes(n);
+      setSavedNotes(n);
+    });
   };
 
   useEffect(() => { load(); }, [id]);
@@ -85,22 +90,20 @@ export default function TravelInfo() {
   useEffect(() => {
     if (!id) return;
     try {
-      const n = localStorage.getItem(notesKey) ?? "";
-      setNotes(n);
-      setSavedNotes(n);
       const g = localStorage.getItem(groundsKey);
       if (g) setGrounds(JSON.parse(g));
     } catch { /* ignore */ }
-  }, [id, notesKey, groundsKey]);
+  }, [id, groundsKey]);
 
   const persistGrounds = (next: Ground[]) => {
     setGrounds(next);
     try { localStorage.setItem(groundsKey, JSON.stringify(next)); } catch { /* ignore */ }
   };
 
-  const saveNotes = () => {
+  const saveNotes = async () => {
+    if (!id) return;
     try {
-      localStorage.setItem(notesKey, notes);
+      await tripsService.updateNotes(id, notes);
       setSavedNotes(notes);
       setNotesSavedFlash(true);
       setTimeout(() => setNotesSavedFlash(false), 2000);

@@ -133,7 +133,7 @@ export const profilesService = {
 // === Trips (Supabase) ===
 const TRIP_SELECT = `
   id, name, country, city, origin_city, start_date, end_date,
-  cover_url, status, styles, budget,
+  cover_url, status, styles, budget, notes,
   members:trip_members(
     user_id,
     role,
@@ -153,6 +153,7 @@ type TripRow = {
   status: Trip["status"];
   styles: Trip["styles"] | null;
   budget: number | null;
+  notes: string | null;
   members?: Array<{
     user_id: string;
     role: UserRole;
@@ -172,6 +173,7 @@ const rowToTrip = (row: TripRow): Trip => ({
   status: row.status,
   styles: row.styles ?? [],
   budget: row.budget ?? undefined,
+  notes: row.notes ?? undefined,
   members: (row.members ?? []).map<TripMember>((m) => ({
     userId: m.user_id,
     role: m.role,
@@ -231,6 +233,14 @@ export const tripsService = {
       .single();
     if (error) throw error;
     return rowToTrip(data as unknown as TripRow);
+  },
+
+  updateNotes: async (tripId: string, notes: string): Promise<void> => {
+    const { error } = await supabase
+      .from("trips")
+      .update({ notes })
+      .eq("id", tripId);
+    if (error) throw error;
   },
 
   /** Add a member by looking up their email in profiles. Throws if no match. */
