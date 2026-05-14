@@ -450,6 +450,20 @@ export default function ItineraryPlanner() {
           </div>
         </div>
       )}
+      {editingIdea && (
+        <EditIdeaModal
+          idea={editingIdea}
+          onClose={() => setEditingIdea(null)}
+          onSaved={(updated) => {
+            setIdeas((arr) => arr.map((i) => (i.id === updated.id ? updated : i)));
+            setScheduled((arr) => arr.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+          }}
+          onDeleted={(ideaId) => {
+            setIdeas((arr) => arr.filter((i) => i.id !== ideaId));
+            setScheduled((arr) => arr.filter((s) => s.id !== ideaId));
+          }}
+        />
+      )}
     </DndContext>
   );
 }
