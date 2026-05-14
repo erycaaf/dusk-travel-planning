@@ -311,10 +311,10 @@ export default function ItineraryPlanner() {
       }
 
       if (data.type === "idea") {
-        const sched = await itineraryService.scheduleIdea(data.idea.id, overData.date, slotMin);
+        const sched = await itineraryService.scheduleIdea(data.idea, overData.date, slotMin);
         if (sched) setScheduled((s) => [...s.filter((x) => x.id !== sched.id), sched]);
       } else if (data.type === "sched") {
-        const sched = await itineraryService.moveScheduled(data.idea.id, overData.date, slotMin);
+        const sched = await itineraryService.moveScheduled(data.idea, overData.date, slotMin);
         if (sched) setScheduled((s) => s.map((x) => (x.id === sched.id ? sched : x)));
       }
     }

@@ -269,72 +269,381 @@ export const tripsService = {
   },
 };
 
-// === Flights / Stays ===
+// === Flights (Supabase) ===
+type FlightRow = {
+  id: string;
+  trip_id: string;
+  airline: string;
+  flight_number: string;
+  from_code: string;
+  to_code: string;
+  from_city: string;
+  to_city: string;
+  departure: string;
+  arrival: string;
+  booking_code: string;
+  terminal: string | null;
+  gate: string | null;
+};
+
+const rowToFlight = (r: FlightRow): Flight => ({
+  id: r.id,
+  tripId: r.trip_id,
+  airline: r.airline,
+  flightNumber: r.flight_number,
+  fromCode: r.from_code,
+  toCode: r.to_code,
+  fromCity: r.from_city,
+  toCity: r.to_city,
+  departure: r.departure,
+  arrival: r.arrival,
+  bookingCode: r.booking_code,
+  terminal: r.terminal ?? undefined,
+  gate: r.gate ?? undefined,
+});
+
 export const flightsService = {
-  byTrip: (tid: string) => wait(store.flights.filter((f) => f.tripId === tid)),
-  add: (f: Omit<Flight, "id">) => {
-    const fl: Flight = { ...f, id: id("f") };
-    store.flights = [...store.flights, fl];
-    return wait(fl);
+  byTrip: async (tid: string): Promise<Flight[]> => {
+    const { data, error } = await supabase
+      .from("flights")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("departure", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToFlight(r as FlightRow));
+  },
+
+  add: async (f: Omit<Flight, "id">): Promise<Flight> => {
+    const { data, error } = await supabase
+      .from("flights")
+      .insert({
+        trip_id: f.tripId,
+        airline: f.airline,
+        flight_number: f.flightNumber,
+        from_code: f.fromCode,
+        to_code: f.toCode,
+        from_city: f.fromCity,
+        to_city: f.toCity,
+        departure: f.departure,
+        arrival: f.arrival,
+        booking_code: f.bookingCode,
+        terminal: f.terminal ?? null,
+        gate: f.gate ?? null,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToFlight(data as FlightRow);
+  },
+
+  remove: async (flightId: string): Promise<void> => {
+    const { error } = await supabase.from("flights").delete().eq("id", flightId);
+    if (error) throw error;
   },
 };
+
+// === Stays (Supabase) ===
+type StayRow = {
+  id: string;
+  trip_id: string;
+  name: string;
+  type: string;
+  address: string | null;
+  check_in: string;
+  check_out: string;
+  booking_code: string;
+  notes: string | null;
+};
+
+const rowToStay = (r: StayRow): Stay => ({
+  id: r.id,
+  tripId: r.trip_id,
+  name: r.name,
+  type: r.type as Stay["type"],
+  address: r.address ?? "",
+  checkIn: r.check_in,
+  checkOut: r.check_out,
+  bookingCode: r.booking_code || undefined,
+});
 
 export const staysService = {
-  byTrip: (tid: string) => wait(store.stays.filter((s) => s.tripId === tid)),
-  add: (s: Omit<Stay, "id">) => {
-    const st: Stay = { ...s, id: id("s") };
-    store.stays = [...store.stays, st];
-    return wait(st);
+  byTrip: async (tid: string): Promise<Stay[]> => {
+    const { data, error } = await supabase
+      .from("stays")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("check_in", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToStay(r as StayRow));
+  },
+
+  add: async (s: Omit<Stay, "id">): Promise<Stay> => {
+    const { data, error } = await supabase
+      .from("stays")
+      .insert({
+        trip_id: s.tripId,
+        name: s.name,
+        type: s.type,
+        address: s.address || null,
+        check_in: s.checkIn,
+        check_out: s.checkOut,
+        booking_code: s.bookingCode ?? "",
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToStay(data as StayRow);
+  },
+
+  remove: async (stayId: string): Promise<void> => {
+    const { error } = await supabase.from("stays").delete().eq("id", stayId);
+    if (error) throw error;
   },
 };
 
-// === Itinerary ===
+// === Itinerary (Supabase) ===
+type IdeaRow = {
+  id: string;
+  trip_id: string;
+  title: string;
+  category: string;
+  duration_min: number;
+  transit_min: number | null;
+  estimated_cost: number | null;
+  location: string | null;
+  notes: string | null;
+  priority: string | null;
+  map_url: string | null;
+};
+
+type SchedRow = {
+  id: string;
+  trip_id: string;
+  date: string;
+  start_min: number;
+};
+
+const rowToIdea = (r: IdeaRow): ActivityIdea => ({
+  id: r.id,
+  tripId: r.trip_id,
+  title: r.title,
+  category: r.category as ActivityIdea["category"],
+  durationMin: r.duration_min,
+  transitMin: r.transit_min ?? undefined,
+  estimatedCost: r.estimated_cost ?? undefined,
+  location: r.location ?? undefined,
+  notes: r.notes ?? undefined,
+  priority: (r.priority as ActivityIdea["priority"]) ?? undefined,
+  mapUrl: r.map_url ?? undefined,
+});
+
+const rowToScheduled = (s: SchedRow, idea: ActivityIdea): ScheduledActivity => ({
+  ...idea,
+  date: s.date,
+  startMin: s.start_min,
+});
+
 export const itineraryService = {
-  ideas: (tid: string) => wait(store.ideas.filter((a) => a.tripId === tid)),
-  scheduled: (tid: string) => wait(store.scheduled.filter((a) => a.tripId === tid)),
-  scheduleIdea: (ideaId: string, date: string, startMin: number) => {
-    const idea = store.ideas.find((i) => i.id === ideaId);
-    if (!idea) return wait(null);
-    const sched: ScheduledActivity = { ...idea, date, startMin };
-    store.scheduled = [...store.scheduled.filter((s) => s.id !== ideaId), sched];
-    return wait(sched);
+  ideas: async (tid: string): Promise<ActivityIdea[]> => {
+    const { data, error } = await supabase
+      .from("activity_ideas")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToIdea(r as IdeaRow));
   },
-  unschedule: (ideaId: string) => {
-    store.scheduled = store.scheduled.filter((s) => s.id !== ideaId);
-    return wait(true);
+
+  scheduled: async (tid: string): Promise<ScheduledActivity[]> => {
+    const [{ data: schedData, error: e1 }, { data: ideasData, error: e2 }] = await Promise.all([
+      supabase.from("scheduled_activities").select("*").eq("trip_id", tid),
+      supabase.from("activity_ideas").select("*").eq("trip_id", tid),
+    ]);
+    if (e1) throw e1;
+    if (e2) throw e2;
+    const ideaMap = Object.fromEntries((ideasData ?? []).map((r) => [r.id, rowToIdea(r as IdeaRow)]));
+    return (schedData ?? [])
+      .map((s) => {
+        const idea = ideaMap[(s as SchedRow).id];
+        return idea ? rowToScheduled(s as SchedRow, idea) : null;
+      })
+      .filter(Boolean) as ScheduledActivity[];
   },
-  moveScheduled: (ideaId: string, date: string, startMin: number) => {
-    store.scheduled = store.scheduled.map((s) => (s.id === ideaId ? { ...s, date, startMin } : s));
-    return wait(store.scheduled.find((s) => s.id === ideaId));
+
+  addIdea: async (idea: Omit<ActivityIdea, "id">): Promise<ActivityIdea> => {
+    const { data, error } = await supabase
+      .from("activity_ideas")
+      .insert({
+        trip_id: idea.tripId,
+        title: idea.title,
+        category: idea.category,
+        duration_min: idea.durationMin,
+        transit_min: idea.transitMin ?? null,
+        estimated_cost: idea.estimatedCost ?? null,
+        location: idea.location ?? null,
+        notes: idea.notes ?? null,
+        priority: idea.priority ?? null,
+        map_url: idea.mapUrl ?? null,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToIdea(data as IdeaRow);
   },
-  addIdea: (idea: Omit<ActivityIdea, "id">) => {
-    const a: ActivityIdea = { ...idea, id: id("a") };
-    store.ideas = [...store.ideas, a];
-    return wait(a);
+
+  scheduleIdea: async (idea: ActivityIdea, date: string, startMin: number): Promise<ScheduledActivity> => {
+    const { error } = await supabase
+      .from("scheduled_activities")
+      .upsert({ id: idea.id, trip_id: idea.tripId, date, start_min: startMin });
+    if (error) throw error;
+    return { ...idea, date, startMin };
+  },
+
+  unschedule: async (ideaId: string): Promise<void> => {
+    const { error } = await supabase.from("scheduled_activities").delete().eq("id", ideaId);
+    if (error) throw error;
+  },
+
+  moveScheduled: async (item: ScheduledActivity, date: string, startMin: number): Promise<ScheduledActivity> => {
+    const { error } = await supabase
+      .from("scheduled_activities")
+      .update({ date, start_min: startMin })
+      .eq("id", item.id);
+    if (error) throw error;
+    return { ...item, date, startMin };
   },
 };
 
-// === Expenses ===
+// === Expenses (Supabase) ===
+type ExpenseRow = {
+  id: string;
+  trip_id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string;
+  paid_by: string | null;
+  date: string;
+  split_with: string[];
+};
+
+const FX_TO_BRL: Record<string, number> = { BRL: 1, ARS: 0.0061, USD: 5.1, EUR: 5.5 };
+
+const rowToExpense = (r: ExpenseRow): Expense => ({
+  id: r.id,
+  tripId: r.trip_id,
+  title: r.description,
+  category: r.category as Expense["category"],
+  amount: Number(r.amount),
+  currency: r.currency as Expense["currency"],
+  amountBRL: Number(r.amount) * (FX_TO_BRL[r.currency] ?? 1),
+  date: r.date,
+  paidBy: r.paid_by ?? "",
+  splitWith: r.split_with ?? [],
+});
+
 export const expensesService = {
-  byTrip: (tid: string) => wait(store.expenses.filter((e) => e.tripId === tid)),
-  add: (e: Omit<Expense, "id">) => {
-    const ex: Expense = { ...e, id: id("e") };
-    store.expenses = [ex, ...store.expenses];
-    return wait(ex);
+  byTrip: async (tid: string): Promise<Expense[]> => {
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("date", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToExpense(r as ExpenseRow));
+  },
+
+  add: async (e: Omit<Expense, "id">): Promise<Expense> => {
+    const { data, error } = await supabase
+      .from("expenses")
+      .insert({
+        trip_id: e.tripId,
+        description: e.title,
+        amount: e.amount,
+        currency: e.currency,
+        category: e.category,
+        paid_by: e.paidBy || null,
+        date: e.date,
+        split_with: e.splitWith,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToExpense(data as ExpenseRow);
+  },
+
+  remove: async (expenseId: string): Promise<void> => {
+    const { error } = await supabase.from("expenses").delete().eq("id", expenseId);
+    if (error) throw error;
   },
 };
 
-// === Packing ===
+// === Packing (Supabase) ===
+type PackingRow = {
+  id: string;
+  trip_id: string;
+  name: string;
+  section: string;
+  packed: boolean;
+  qty: number;
+  assigned_to: string | null;
+};
+
+const rowToPacking = (r: PackingRow): PackingItem => ({
+  id: r.id,
+  tripId: r.trip_id,
+  name: r.name,
+  section: r.section as PackingItem["section"],
+  packed: r.packed,
+  qty: r.qty,
+  assignedTo: r.assigned_to ?? undefined,
+});
+
 export const packingService = {
-  byTrip: (tid: string) => wait(store.packing.filter((p) => p.tripId === tid)),
-  toggle: (pid: string) => {
-    store.packing = store.packing.map((p) => (p.id === pid ? { ...p, packed: !p.packed } : p));
-    return wait(store.packing.find((p) => p.id === pid));
+  byTrip: async (tid: string): Promise<PackingItem[]> => {
+    const { data, error } = await supabase
+      .from("packing_items")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToPacking(r as PackingRow));
   },
-  add: (p: Omit<PackingItem, "id">) => {
-    const it: PackingItem = { ...p, id: id("p") };
-    store.packing = [...store.packing, it];
-    return wait(it);
+
+  add: async (p: Omit<PackingItem, "id">): Promise<PackingItem> => {
+    const { data, error } = await supabase
+      .from("packing_items")
+      .insert({
+        trip_id: p.tripId,
+        name: p.name,
+        section: p.section,
+        packed: p.packed,
+        qty: p.qty,
+        assigned_to: p.assignedTo ?? null,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToPacking(data as PackingRow);
+  },
+
+  toggle: async (pid: string): Promise<void> => {
+    const { data, error: fetchErr } = await supabase
+      .from("packing_items")
+      .select("packed")
+      .eq("id", pid)
+      .single();
+    if (fetchErr) throw fetchErr;
+    const { error } = await supabase
+      .from("packing_items")
+      .update({ packed: !(data as { packed: boolean }).packed })
+      .eq("id", pid);
+    if (error) throw error;
+  },
+
+  remove: async (pid: string): Promise<void> => {
+    const { error } = await supabase.from("packing_items").delete().eq("id", pid);
+    if (error) throw error;
   },
 };
 
