@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { fmtBRL, minutesToLabel, minutesToHHmm } from "@/lib/format";
 import { addDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { EditIdeaModal } from "@/components/EditIdeaModal";
 
 const HOUR_START = 6;   // 06:00
 const HOUR_END = 23;    // 23:00
