@@ -6,10 +6,39 @@ import { fmtDate, fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plane, Plus, X, Trash2 } from "lucide-react";
+import { Plane, Plus, X, Trash2, Bus, Train, Car, Ship, Map as MapIcon, Check } from "lucide-react";
 import { MapPlaceholder } from "@/components/MapPlaceholder";
 import { cn, errorMessage } from "@/lib/utils";
 import { toast } from "sonner";
+
+type GroundType = "onibus" | "trem" | "carro" | "ferry" | "outro";
+interface Ground {
+  id: string;
+  type: GroundType;
+  fromCity: string;
+  toCity: string;
+  departure: string;
+  arrival: string;
+  bookingCode?: string;
+}
+
+const GROUND_META: Record<GroundType, { label: string; icon: typeof Bus }> = {
+  onibus: { label: "Ônibus", icon: Bus },
+  trem: { label: "Trem", icon: Train },
+  carro: { label: "Carro", icon: Car },
+  ferry: { label: "Ferry", icon: Ship },
+  outro: { label: "Outro", icon: MapIcon },
+};
+
+const EMPTY_GROUND = {
+  type: "onibus" as GroundType,
+  fromCity: "",
+  toCity: "",
+  departure: "",
+  arrival: "",
+  bookingCode: "",
+};
+
 
 type Tab = "voos" | "terrestre" | "paises" | "anotacoes";
 
@@ -33,9 +62,17 @@ export default function TravelInfo() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [tab, setTab] = useState<Tab>("voos");
   const [notes, setNotes] = useState("");
+  const [savedNotes, setSavedNotes] = useState("");
+  const [notesSavedFlash, setNotesSavedFlash] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [grounds, setGrounds] = useState<Ground[]>([]);
+  const [showGroundForm, setShowGroundForm] = useState(false);
+  const [groundForm, setGroundForm] = useState(EMPTY_GROUND);
+
+  const notesKey = id ? `dusk:trip:${id}:notes` : "";
+  const groundsKey = id ? `dusk:trip:${id}:grounds` : "";
 
   const load = () => {
     if (!id) return;
@@ -44,6 +81,60 @@ export default function TravelInfo() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const n = localStorage.getItem(notesKey) ?? "";
+      setNotes(n);
+      setSavedNotes(n);
+      const g = localStorage.getItem(groundsKey);
+      if (g) setGrounds(JSON.parse(g));
+    } catch { /* ignore */ }
+  }, [id, notesKey, groundsKey]);
+
+  const persistGrounds = (next: Ground[]) => {
+    setGrounds(next);
+    try { localStorage.setItem(groundsKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const saveNotes = () => {
+    try {
+      localStorage.setItem(notesKey, notes);
+      setSavedNotes(notes);
+      setNotesSavedFlash(true);
+      setTimeout(() => setNotesSavedFlash(false), 2000);
+    } catch (err) {
+      toast.error(errorMessage(err, "Erro ao salvar anotações"));
+    }
+  };
+
+  const groundField = (key: keyof typeof EMPTY_GROUND) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setGroundForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const canSaveGround = groundForm.fromCity && groundForm.toCity && groundForm.departure && groundForm.arrival;
+
+  const saveGround = () => {
+    if (!canSaveGround) return;
+    const next: Ground = {
+      id: `gr-${Date.now().toString(36)}`,
+      type: groundForm.type,
+      fromCity: groundForm.fromCity,
+      toCity: groundForm.toCity,
+      departure: groundForm.departure,
+      arrival: groundForm.arrival,
+      bookingCode: groundForm.bookingCode || undefined,
+    };
+    persistGrounds([...grounds, next]);
+    setGroundForm(EMPTY_GROUND);
+    setShowGroundForm(false);
+    toast.success("Transporte adicionado!");
+  };
+
+  const removeGround = (gid: string) => {
+    persistGrounds(grounds.filter((g) => g.id !== gid));
+    toast.success("Transporte removido.");
+  };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -230,9 +321,117 @@ export default function TravelInfo() {
       )}
 
       {tab === "terrestre" && (
-        <div className="rounded-2xl bg-card border border-border/50 p-8 text-center text-muted-foreground">
-          Nenhum transporte terrestre adicionado ainda.<br />
-          <Button variant="outline" className="mt-4"><Plus className="h-4 w-4" /> Adicionar transporte</Button>
+        <div className="space-y-4">
+          {grounds.length === 0 && !showGroundForm && (
+            <div className="rounded-2xl bg-card border border-border/50 p-8 text-center text-muted-foreground">
+              Nenhum transporte terrestre adicionado ainda.
+            </div>
+          )}
+
+          {grounds.map((g) => {
+            const meta = GROUND_META[g.type];
+            const Icon = meta.icon;
+            return (
+              <article key={g.id} className="rounded-2xl bg-card border border-border/50 shadow-card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-primary/10 text-primary p-2.5"><Icon className="h-5 w-5" /></div>
+                    <div>
+                      <p className="font-display font-semibold">{meta.label}</p>
+                      {g.bookingCode && <p className="text-xs text-muted-foreground">Reserva {g.bookingCode}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => removeGround(g.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1" aria-label="Remover transporte">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-4 py-2">
+                  <div className="text-center flex-1">
+                    <p className="font-display font-bold text-lg">{g.fromCity}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDate(g.departure)} · {fmtTime(g.departure)}</p>
+                  </div>
+                  <div className="flex-1 flex items-center gap-2 text-muted-foreground">
+                    <div className="h-px bg-border flex-1" /><Icon className="h-4 w-4" /><div className="h-px bg-border flex-1" />
+                  </div>
+                  <div className="text-center flex-1">
+                    <p className="font-display font-bold text-lg">{g.toCity}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDate(g.arrival)} · {fmtTime(g.arrival)}</p>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+
+          {showGroundForm && (
+            <div className="rounded-2xl bg-card border border-border/50 shadow-card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="font-display font-semibold">Novo transporte</p>
+                <button onClick={() => { setShowGroundForm(false); setGroundForm(EMPTY_GROUND); }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Tipo</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(GROUND_META) as GroundType[]).map((t) => {
+                    const M = GROUND_META[t];
+                    const Icon = M.icon;
+                    const active = groundForm.type === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setGroundForm((f) => ({ ...f, type: t }))}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium border transition-colors",
+                          active ? "bg-primary/15 text-primary border-primary/30" : "bg-card text-muted-foreground border-border hover:border-primary/40",
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" /> {M.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Origem</Label>
+                  <Input value={groundForm.fromCity} onChange={groundField("fromCity")} placeholder="Mendoza" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Destino</Label>
+                  <Input value={groundForm.toCity} onChange={groundField("toCity")} placeholder="Buenos Aires" />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Partida</Label>
+                  <Input type="datetime-local" value={groundForm.departure} onChange={groundField("departure")} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Chegada</Label>
+                  <Input type="datetime-local" value={groundForm.arrival} onChange={groundField("arrival")} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Código de reserva</Label>
+                <Input value={groundForm.bookingCode} onChange={groundField("bookingCode")} placeholder="opcional" />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setShowGroundForm(false); setGroundForm(EMPTY_GROUND); }}>Cancelar</Button>
+                <Button variant="sunset" onClick={saveGround} disabled={!canSaveGround}>Salvar transporte</Button>
+              </div>
+            </div>
+          )}
+
+          {!showGroundForm && (
+            <Button variant="outline" onClick={() => setShowGroundForm(true)}>
+              <Plus className="h-4 w-4" /> Adicionar transporte
+            </Button>
+          )}
         </div>
       )}
 
@@ -255,13 +454,25 @@ export default function TravelInfo() {
       )}
 
       {tab === "anotacoes" && (
-        <div className="rounded-2xl bg-card border border-border/50 p-5">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anotações gerais sobre a viagem — adaptadores, contatos, confirmações..."
-            className="w-full min-h-[200px] bg-transparent border-0 outline-none resize-none text-sm"
-          />
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-card border border-border/50 p-5">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anotações gerais — adaptadores, contatos importantes, confirmações..."
+              className="w-full min-h-[240px] bg-transparent border-0 outline-none resize-none text-sm"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 min-h-[44px]">
+            {notesSavedFlash && (
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground animate-fade-in">
+                <Check className="h-4 w-4 text-primary" /> Salvo
+              </span>
+            )}
+            {notes !== savedNotes && (
+              <Button variant="sunset" onClick={saveNotes}>Salvar anotações</Button>
+            )}
+          </div>
         </div>
       )}
     </div>

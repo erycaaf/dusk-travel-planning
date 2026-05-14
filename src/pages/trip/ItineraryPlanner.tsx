@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { fmtBRL, minutesToLabel, minutesToHHmm } from "@/lib/format";
 import { addDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { EditIdeaModal } from "@/components/EditIdeaModal";
 
 const HOUR_START = 6;   // 06:00
 const HOUR_END = 23;    // 23:00
@@ -30,7 +31,7 @@ function snapToSlot(min: number) {
 }
 
 // ---------- Idea card (draggable from library) ----------
-function IdeaCard({ idea }: { idea: ActivityIdea }) {
+function IdeaCard({ idea, onEdit }: { idea: ActivityIdea; onEdit: (idea: ActivityIdea) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `idea:${idea.id}`,
     data: { type: "idea", idea },
@@ -41,6 +42,7 @@ function IdeaCard({ idea }: { idea: ActivityIdea }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={() => onEdit(idea)}
       className={cn(
         "group rounded-xl bg-card border border-border/60 p-3 cursor-grab active:cursor-grabbing select-none transition-all",
         "hover:border-primary/40 hover:shadow-card",
@@ -192,12 +194,13 @@ function DayColumn({
 
 // ---------- Library droppable (drop here to unschedule) ----------
 function IdeasLibrary({
-  ideas, search, setSearch, onAddIdea,
+  ideas, search, setSearch, onAddIdea, onEditIdea,
 }: {
   ideas: ActivityIdea[];
   search: string;
   setSearch: (v: string) => void;
   onAddIdea: () => void;
+  onEditIdea: (idea: ActivityIdea) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "lib", data: { type: "lib" } });
   const filtered = ideas.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()));
@@ -213,7 +216,7 @@ function IdeasLibrary({
       </div>
       <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Nada na biblioteca.</p>}
-        {filtered.map((i) => <IdeaCard key={i.id} idea={i} />)}
+        {filtered.map((i) => <IdeaCard key={i.id} idea={i} onEdit={onEditIdea} />)}
       </div>
     </div>
   );
@@ -229,6 +232,7 @@ export default function ItineraryPlanner() {
   const [search, setSearch] = useState("");
   const [activeDrag, setActiveDrag] = useState<ActivityIdea | null>(null);
   const [editing, setEditing] = useState<ScheduledActivity | null>(null);
+  const [editingIdea, setEditingIdea] = useState<ActivityIdea | null>(null);
   const [view, setView] = useState<"library" | "calendar">("calendar"); // mobile only
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -349,6 +353,7 @@ export default function ItineraryPlanner() {
                 const t = await itineraryService.addIdea({ tripId: trip.id, title: "Nova ideia", category: "outro", durationMin: 60 });
                 setIdeas((arr) => [...arr, t]);
               }}
+              onEditIdea={(idea) => setEditingIdea(idea)}
             />
           </div>
 
@@ -444,6 +449,20 @@ export default function ItineraryPlanner() {
             </div>
           </div>
         </div>
+      )}
+      {editingIdea && (
+        <EditIdeaModal
+          idea={editingIdea}
+          onClose={() => setEditingIdea(null)}
+          onSaved={(updated) => {
+            setIdeas((arr) => arr.map((i) => (i.id === updated.id ? updated : i)));
+            setScheduled((arr) => arr.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+          }}
+          onDeleted={(ideaId) => {
+            setIdeas((arr) => arr.filter((i) => i.id !== ideaId));
+            setScheduled((arr) => arr.filter((s) => s.id !== ideaId));
+          }}
+        />
       )}
     </DndContext>
   );
