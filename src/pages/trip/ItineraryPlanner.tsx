@@ -193,12 +193,13 @@ function DayColumn({
 
 // ---------- Library droppable (drop here to unschedule) ----------
 function IdeasLibrary({
-  ideas, search, setSearch, onAddIdea,
+  ideas, search, setSearch, onAddIdea, onEditIdea,
 }: {
   ideas: ActivityIdea[];
   search: string;
   setSearch: (v: string) => void;
   onAddIdea: () => void;
+  onEditIdea: (idea: ActivityIdea) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "lib", data: { type: "lib" } });
   const filtered = ideas.filter((i) => i.title.toLowerCase().includes(search.toLowerCase()));
@@ -214,7 +215,7 @@ function IdeasLibrary({
       </div>
       <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Nada na biblioteca.</p>}
-        {filtered.map((i) => <IdeaCard key={i.id} idea={i} />)}
+        {filtered.map((i) => <IdeaCard key={i.id} idea={i} onEdit={onEditIdea} />)}
       </div>
     </div>
   );
