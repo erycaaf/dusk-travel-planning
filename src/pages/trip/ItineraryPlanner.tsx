@@ -231,6 +231,7 @@ export default function ItineraryPlanner() {
   const [search, setSearch] = useState("");
   const [activeDrag, setActiveDrag] = useState<ActivityIdea | null>(null);
   const [editing, setEditing] = useState<ScheduledActivity | null>(null);
+  const [editingIdea, setEditingIdea] = useState<ActivityIdea | null>(null);
   const [view, setView] = useState<"library" | "calendar">("calendar"); // mobile only
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
