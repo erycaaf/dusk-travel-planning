@@ -57,6 +57,9 @@
     --gradient-sunset-soft: linear-gradient(135deg, hsl(266 53% 50% / 0.08) 0%, hsl(14 100% 67% / 0.08) 60%, hsl(25 98% 72% / 0.12) 100%);
     --gradient-sunset-vertical: linear-gradient(180deg, hsl(266 53% 50%) 0%, hsl(14 100% 67%) 60%, hsl(25 98% 72%) 100%);
 
+    /* Night sky gradient — used when dusk deepens into night (intro animation) */
+    --gradient-night: linear-gradient(135deg, hsl(232 60% 10%) 0%, hsl(252 45% 22%) 45%, hsl(266 53% 38%) 100%);
+
     /* Premium shadows — long blur, low opacity */
     --shadow-soft: 0 4px 20px -4px hsl(270 22% 18% / 0.06);
     --shadow-card: 0 8px 30px -10px hsl(270 22% 18% / 0.08);
@@ -150,6 +153,9 @@
   .bg-sunset-soft {
     background: var(--gradient-sunset-soft);
   }
+  .bg-night {
+    background: var(--gradient-night);
+  }
   .text-sunset {
     background: var(--gradient-sunset);
     -webkit-background-clip: text;
@@ -224,4 +230,45 @@
   background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--background)) 50%, hsl(var(--muted)) 100%);
   background-size: 800px 100%;
   animation: shimmer 1.6s infinite linear;
+}
+
+/* ===========================================
+   INTRO — plane crossing sunset into night
+   =========================================== */
+
+@keyframes intro-sky-fade {
+  0%, 15% { opacity: 0; }
+  70%, 100% { opacity: 1; }
+}
+
+/* Plane follows a curved path from bottom-left to top-right, arcing gently upward.
+   6 waypoints sampled from a quadratic Bezier so segments are near-uniform in length —
+   combined with linear easing, this produces a smooth constant-velocity flight. */
+@keyframes intro-plane-fly {
+  0%   { transform: translate(-15vw, 78vh) rotate(30deg); opacity: 0; }
+  8%   { opacity: 1; }
+  20%  { transform: translate(11vw, 57vh) rotate(24deg); }
+  40%  { transform: translate(37vw, 37vh) rotate(18deg); }
+  60%  { transform: translate(63vw, 20vh) rotate(12deg); }
+  80%  { transform: translate(89vw, 5vh)  rotate(5deg); }
+  92%  { opacity: 1; }
+  100% { transform: translate(115vw, -8vh) rotate(-3deg); opacity: 0.9; }
+}
+
+/* Each trail dot fades in, holds briefly, and gently fades out */
+@keyframes intro-dot-appear {
+  0%   { opacity: 0; transform: scale(0.3); }
+  25%  { opacity: 0.9; transform: scale(1); }
+  75%  { opacity: 0.9; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
+@keyframes intro-star-twinkle {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.9; }
+}
+
+@keyframes intro-rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }

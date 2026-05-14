@@ -1,10 +1,10 @@
-import { NavLink, Outlet, useParams, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
 import { Home, MapPin, Calendar, Wallet, Backpack, Users, User, Settings, Hotel, Plane } from "lucide-react";
 import { DuskLogo } from "@/components/DuskLogo";
 import { cn } from "@/lib/utils";
 import { TravelerAvatarGroup } from "@/components/TravelerAvatarGroup";
 import { useEffect, useState } from "react";
-import { tripsService, usersService } from "@/services";
+import { tripsService, profilesService } from "@/services";
 import type { Trip, User as TUser } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Bell } from "lucide-react";
@@ -30,16 +30,26 @@ export function AppShell() {
   const tripId = params.id;
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<TUser[]>([]);
+  const [me, setMe] = useState<TUser | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Load current user's profile; if incomplete (no name), redirect to profile welcome.
+  useEffect(() => {
+    profilesService.getCurrent().then((profile) => {
+      setMe(profile);
+      if (profile && !profile.name.trim() && location.pathname !== "/profile") {
+        navigate("/profile?welcome=1", { replace: true });
+      }
+    });
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     if (!tripId) { setTrip(null); setMembers([]); return; }
     tripsService.get(tripId).then((t) => {
       if (!t) return;
       setTrip(t);
-      Promise.all(t.members.map((m) => usersService.get(m.userId))).then((us) => {
-        setMembers(us.filter(Boolean) as TUser[]);
-      });
+      setMembers(t.members.map((m) => m.profile).filter(Boolean) as TUser[]);
     });
   }, [tripId]);
 
@@ -127,10 +137,10 @@ export function AppShell() {
                 <TravelerAvatarGroup users={members} size={28} ringClass="ring-background" />
               )}
               <Button size="icon" variant="ghost" aria-label="Notificações"><Bell className="h-4 w-4" /></Button>
-              <NavLink to="/profile" className="rounded-full">
+              <NavLink to="/profile" className="rounded-full" aria-label="Seu perfil">
                 <img
-                  src="https://i.pravatar.cc/200?img=47"
-                  alt="Seu perfil"
+                  src={me?.avatarUrl ?? `https://i.pravatar.cc/200?u=${me?.email ?? "anon"}`}
+                  alt={me?.name || "Seu perfil"}
                   className="h-9 w-9 rounded-full ring-2 ring-background object-cover"
                 />
               </NavLink>

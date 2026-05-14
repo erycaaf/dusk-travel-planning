@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { coverGallery } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
-import { tripsService } from "@/services";
+import { cn, errorMessage } from "@/lib/utils";
+import { tripsService, storageService } from "@/services";
 import { toast } from "sonner";
-import { Check, X, ChevronLeft, ChevronRight, Sparkles, Calendar as CalIcon, Users as UsersIcon, MapPin } from "lucide-react";
+import { Check, X, ChevronLeft, ChevronRight, Sparkles, Calendar as CalIcon, Users as UsersIcon, MapPin, ImagePlus } from "lucide-react";
 import type { TripStyle, UserRole } from "@/lib/types";
 import { tripDuration, fmtDateRange } from "@/lib/format";
 
@@ -34,7 +34,9 @@ export default function NewTrip() {
   const [name, setName] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
-  const [coverId, setCoverId] = useState(coverGallery[0].id);
+  const [coverId, setCoverId] = useState<string>(coverGallery[0].id);
+  const [customCover, setCustomCover] = useState<{ url: string; label: string; file: File } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [origin, setOrigin] = useState("São Paulo");
@@ -45,8 +47,30 @@ export default function NewTrip() {
 
   const [styles, setStyles] = useState<TripStyle[]>([]);
 
-  const cover = coverGallery.find((c) => c.id === coverId)!;
+  const cover = customCover && coverId === "custom"
+    ? customCover
+    : coverGallery.find((c) => c.id === coverId) ?? coverGallery[0];
   const duration = start && end ? tripDuration(start, end) : 0;
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Imagem grande demais — limite de 5MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = reader.result as string;
+      setCustomCover({ url, label: file.name, file });
+      setCoverId("custom");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const canNext = (() => {
     if (step === 1) return name.trim() && country.trim() && city.trim();
@@ -62,17 +86,55 @@ export default function NewTrip() {
     setMemberInput("");
   };
 
+  const [creating, setCreating] = useState(false);
+
   const submit = async () => {
-    const trip = await tripsService.create({
-      name, country, city, originCity: origin,
-      startDate: start, endDate: end,
-      coverUrl: cover.url,
-      status: "planning",
-      styles,
-      members: [{ userId: "u-eryca", role: "owner" }],
-    });
-    toast.success("Viagem criada — boa jornada!");
-    nav(`/trips/${trip.id}`);
+    setCreating(true);
+    try {
+      let coverUrl = cover.url;
+      if (coverId === "custom" && customCover?.file) {
+        coverUrl = await storageService.uploadCover(customCover.file);
+      }
+
+      const trip = await tripsService.create({
+        name,
+        country,
+        city,
+        originCity: origin,
+        startDate: start,
+        endDate: end,
+        coverUrl,
+        status: "planning",
+        styles,
+      });
+
+      // Try to add each invited member. Collect failures so we can warn the user
+      // without blocking the trip creation itself.
+      const failures: string[] = [];
+      for (const m of members) {
+        try {
+          await tripsService.addMemberByEmail(trip.id, m.email, m.role);
+        } catch (err) {
+          failures.push(m.email);
+          console.warn(`Falha ao convidar ${m.email}:`, err);
+        }
+      }
+
+      if (failures.length > 0) {
+        toast.warning(
+          `Viagem criada, mas não consegui adicionar: ${failures.join(", ")}. Peça pra essas pessoas entrarem no Dusk e adicione depois.`,
+        );
+      } else {
+        toast.success("Viagem criada — boa jornada!");
+      }
+      nav(`/trips/${trip.id}`);
+    } catch (err) {
+      console.error("Erro ao criar viagem:", err);
+      const msg = errorMessage(err, "Erro ao criar viagem");
+      toast.error(msg);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -126,8 +188,49 @@ export default function NewTrip() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Imagem de capa</Label>
+              <div className="flex items-center justify-between">
+                <Label>Imagem de capa</Label>
+                <p className="text-xs text-muted-foreground">Escolha da galeria ou envie a sua</p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFilePick}
+              />
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "relative rounded-xl overflow-hidden aspect-[4/3] ring-2 transition-all flex flex-col items-center justify-center gap-2",
+                    coverId === "custom" && customCover
+                      ? "ring-primary shadow-glow"
+                      : "ring-dashed ring-border hover:ring-primary/60 bg-muted/40",
+                  )}
+                  aria-pressed={coverId === "custom"}
+                  aria-label={customCover ? "Trocar imagem enviada" : "Enviar imagem própria"}
+                >
+                  {customCover ? (
+                    <>
+                      <img src={customCover.url} alt="Capa enviada" className="absolute inset-0 h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-foreground/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">Trocar imagem</span>
+                      </div>
+                      {coverId === "custom" && (
+                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1 z-10">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground text-center px-2">Enviar imagem própria</span>
+                    </>
+                  )}
+                </button>
                 {coverGallery.map((c) => (
                   <button
                     key={c.id}
@@ -247,8 +350,8 @@ export default function NewTrip() {
             Continuar <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button variant="sunset" onClick={submit} disabled={!canNext}>
-            Criar viagem
+          <Button variant="sunset" onClick={submit} disabled={!canNext || creating}>
+            {creating ? "Criando..." : "Criar viagem"}
           </Button>
         )}
       </div>

@@ -5,9 +5,9 @@ import { Link } from "react-router-dom";
 
 export function AuthLayout({ children, title, subtitle }: { children: ReactNode; title: string; subtitle?: string }) {
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-2 bg-background">
+    <div className="min-h-screen lg:grid lg:grid-cols-2 bg-sunset-soft">
       {/* Form side */}
-      <div className="flex flex-col px-6 sm:px-12 py-10">
+      <div className="flex flex-col px-6 sm:px-12 py-10 animate-fade-in-slow">
         <Link to="/" aria-label="Início"><DuskLogo variant="full" size="md" /></Link>
         <div className="flex-1 flex items-center justify-center py-10">
           <div className="w-full max-w-sm space-y-8 animate-fade-in">

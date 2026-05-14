@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { expensesService, tripsService, usersService } from "@/services";
+import { expensesService, tripsService, authService } from "@/services";
 import type { Expense, ExpenseCategory, User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CategoryBadge, getExpenseMeta } from "@/components/CategoryBadge";
 import { fmtBRL, fmtCurrency, fmtDate } from "@/lib/format";
-import { Plus, X, ArrowDownLeft, ArrowUpRight, Wallet, Users as UsersIcon } from "lucide-react";
+import { Plus, X, ArrowDownLeft, ArrowUpRight, Wallet, Users as UsersIcon, Trash2 } from "lucide-react";
 import { TravelerAvatarGroup } from "@/components/TravelerAvatarGroup";
 import { StatCard } from "@/components/StatCard";
 import { cn } from "@/lib/utils";
@@ -23,16 +23,16 @@ export default function Expenses() {
   const [members, setMembers] = useState<User[]>([]);
   const [tab, setTab] = useState<Tab>("all");
   const [open, setOpen] = useState(false);
-  const me = "u-eryca";
+  const [me, setMe] = useState("");
 
   useEffect(() => {
     if (!id) return;
     expensesService.byTrip(id).then(setExpenses);
-    tripsService.get(id).then(async (t) => {
+    tripsService.get(id).then((t) => {
       if (!t) return;
-      const us = await Promise.all(t.members.map((m) => usersService.get(m.userId)));
-      setMembers(us.filter(Boolean) as User[]);
+      setMembers(t.members.map((m) => m.profile).filter(Boolean) as User[]);
     });
+    authService.getCurrent().then((u) => { if (u) setMe(u.id); });
   }, [id]);
 
   const userById = (uid: string) => members.find((m) => m.id === uid);
@@ -143,10 +143,17 @@ export default function Expenses() {
                   <p className="font-display font-semibold">{fmtCurrency(e.amount, e.currency)}</p>
                   {e.currency !== "BRL" && <p className="text-xs text-muted-foreground">{fmtBRL(e.amountBRL)}</p>}
                 </div>
-                <div className="hidden sm:flex flex-col items-end gap-1 min-w-[120px]">
-                  {payer && <img src={payer.avatarUrl} alt={payer.name} title={`Pago por ${payer.name}`} className="w-7 h-7 rounded-full object-cover" />}
+                <div className="hidden sm:flex flex-col items-end gap-1 min-w-[100px]">
+                  {payer && <img src={payer.avatarUrl ?? ""} alt={payer.name} title={`Pago por ${payer.name}`} className="w-7 h-7 rounded-full object-cover bg-muted" />}
                   <TravelerAvatarGroup users={e.splitWith.map((uid) => userById(uid)).filter(Boolean) as User[]} size={20} />
                 </div>
+                <button
+                  onClick={() => expensesService.remove(e.id).then(() => setExpenses((arr) => arr.filter((x) => x.id !== e.id)))}
+                  className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                  aria-label="Remover gasto"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </li>
             );
           })}

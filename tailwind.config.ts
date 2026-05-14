@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         display: ['"Poppins"', "system-ui", "sans-serif"],
         body: ['"Inter"', "system-ui", "sans-serif"],
+        brand: ['"Fraunces"', '"Poppins"', "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
