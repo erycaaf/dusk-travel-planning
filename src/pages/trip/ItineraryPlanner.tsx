@@ -30,7 +30,7 @@ function snapToSlot(min: number) {
 }
 
 // ---------- Idea card (draggable from library) ----------
-function IdeaCard({ idea }: { idea: ActivityIdea }) {
+function IdeaCard({ idea, onEdit }: { idea: ActivityIdea; onEdit: (idea: ActivityIdea) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `idea:${idea.id}`,
     data: { type: "idea", idea },
@@ -41,6 +41,7 @@ function IdeaCard({ idea }: { idea: ActivityIdea }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={() => onEdit(idea)}
       className={cn(
         "group rounded-xl bg-card border border-border/60 p-3 cursor-grab active:cursor-grabbing select-none transition-all",
         "hover:border-primary/40 hover:shadow-card",
