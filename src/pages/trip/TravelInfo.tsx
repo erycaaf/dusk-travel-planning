@@ -454,13 +454,25 @@ export default function TravelInfo() {
       )}
 
       {tab === "anotacoes" && (
-        <div className="rounded-2xl bg-card border border-border/50 p-5">
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anotações gerais sobre a viagem — adaptadores, contatos, confirmações..."
-            className="w-full min-h-[200px] bg-transparent border-0 outline-none resize-none text-sm"
-          />
+        <div className="space-y-3">
+          <div className="rounded-2xl bg-card border border-border/50 p-5">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anotações gerais — adaptadores, contatos importantes, confirmações..."
+              className="w-full min-h-[240px] bg-transparent border-0 outline-none resize-none text-sm"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 min-h-[44px]">
+            {notesSavedFlash && (
+              <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground animate-fade-in">
+                <Check className="h-4 w-4 text-primary" /> Salvo
+              </span>
+            )}
+            {notes !== savedNotes && (
+              <Button variant="sunset" onClick={saveNotes}>Salvar anotações</Button>
+            )}
+          </div>
         </div>
       )}
     </div>
