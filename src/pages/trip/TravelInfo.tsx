@@ -62,9 +62,17 @@ export default function TravelInfo() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [tab, setTab] = useState<Tab>("voos");
   const [notes, setNotes] = useState("");
+  const [savedNotes, setSavedNotes] = useState("");
+  const [notesSavedFlash, setNotesSavedFlash] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [grounds, setGrounds] = useState<Ground[]>([]);
+  const [showGroundForm, setShowGroundForm] = useState(false);
+  const [groundForm, setGroundForm] = useState(EMPTY_GROUND);
+
+  const notesKey = id ? `dusk:trip:${id}:notes` : "";
+  const groundsKey = id ? `dusk:trip:${id}:grounds` : "";
 
   const load = () => {
     if (!id) return;
@@ -73,6 +81,60 @@ export default function TravelInfo() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    try {
+      const n = localStorage.getItem(notesKey) ?? "";
+      setNotes(n);
+      setSavedNotes(n);
+      const g = localStorage.getItem(groundsKey);
+      if (g) setGrounds(JSON.parse(g));
+    } catch { /* ignore */ }
+  }, [id, notesKey, groundsKey]);
+
+  const persistGrounds = (next: Ground[]) => {
+    setGrounds(next);
+    try { localStorage.setItem(groundsKey, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+
+  const saveNotes = () => {
+    try {
+      localStorage.setItem(notesKey, notes);
+      setSavedNotes(notes);
+      setNotesSavedFlash(true);
+      setTimeout(() => setNotesSavedFlash(false), 2000);
+    } catch (err) {
+      toast.error(errorMessage(err, "Erro ao salvar anotações"));
+    }
+  };
+
+  const groundField = (key: keyof typeof EMPTY_GROUND) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setGroundForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const canSaveGround = groundForm.fromCity && groundForm.toCity && groundForm.departure && groundForm.arrival;
+
+  const saveGround = () => {
+    if (!canSaveGround) return;
+    const next: Ground = {
+      id: `gr-${Date.now().toString(36)}`,
+      type: groundForm.type,
+      fromCity: groundForm.fromCity,
+      toCity: groundForm.toCity,
+      departure: groundForm.departure,
+      arrival: groundForm.arrival,
+      bookingCode: groundForm.bookingCode || undefined,
+    };
+    persistGrounds([...grounds, next]);
+    setGroundForm(EMPTY_GROUND);
+    setShowGroundForm(false);
+    toast.success("Transporte adicionado!");
+  };
+
+  const removeGround = (gid: string) => {
+    persistGrounds(grounds.filter((g) => g.id !== gid));
+    toast.success("Transporte removido.");
+  };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
