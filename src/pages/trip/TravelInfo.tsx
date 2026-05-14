@@ -6,10 +6,39 @@ import { fmtDate, fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plane, Plus, X, Trash2 } from "lucide-react";
+import { Plane, Plus, X, Trash2, Bus, Train, Car, Ship, Map as MapIcon, Check } from "lucide-react";
 import { MapPlaceholder } from "@/components/MapPlaceholder";
 import { cn, errorMessage } from "@/lib/utils";
 import { toast } from "sonner";
+
+type GroundType = "onibus" | "trem" | "carro" | "ferry" | "outro";
+interface Ground {
+  id: string;
+  type: GroundType;
+  fromCity: string;
+  toCity: string;
+  departure: string;
+  arrival: string;
+  bookingCode?: string;
+}
+
+const GROUND_META: Record<GroundType, { label: string; icon: typeof Bus }> = {
+  onibus: { label: "Ônibus", icon: Bus },
+  trem: { label: "Trem", icon: Train },
+  carro: { label: "Carro", icon: Car },
+  ferry: { label: "Ferry", icon: Ship },
+  outro: { label: "Outro", icon: MapIcon },
+};
+
+const EMPTY_GROUND = {
+  type: "onibus" as GroundType,
+  fromCity: "",
+  toCity: "",
+  departure: "",
+  arrival: "",
+  bookingCode: "",
+};
+
 
 type Tab = "voos" | "terrestre" | "paises" | "anotacoes";
 
