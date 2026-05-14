@@ -501,6 +501,32 @@ export const itineraryService = {
     return rowToIdea(data as IdeaRow);
   },
 
+  updateIdea: async (ideaId: string, patch: Partial<Omit<ActivityIdea, "id" | "tripId">>): Promise<ActivityIdea> => {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.title !== undefined) dbPatch.title = patch.title;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.durationMin !== undefined) dbPatch.duration_min = patch.durationMin;
+    if (patch.transitMin !== undefined) dbPatch.transit_min = patch.transitMin ?? null;
+    if (patch.estimatedCost !== undefined) dbPatch.estimated_cost = patch.estimatedCost ?? null;
+    if (patch.location !== undefined) dbPatch.location = patch.location ?? null;
+    if (patch.notes !== undefined) dbPatch.notes = patch.notes ?? null;
+    if (patch.priority !== undefined) dbPatch.priority = patch.priority ?? null;
+    const { data, error } = await supabase
+      .from("activity_ideas")
+      .update(dbPatch)
+      .eq("id", ideaId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToIdea(data as IdeaRow);
+  },
+
+  removeIdea: async (ideaId: string): Promise<void> => {
+    await supabase.from("scheduled_activities").delete().eq("id", ideaId);
+    const { error } = await supabase.from("activity_ideas").delete().eq("id", ideaId);
+    if (error) throw error;
+  },
+
   scheduleIdea: async (idea: ActivityIdea, date: string, startMin: number): Promise<ScheduledActivity> => {
     const { error } = await supabase
       .from("scheduled_activities")
