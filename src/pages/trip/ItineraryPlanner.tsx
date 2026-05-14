@@ -352,6 +352,7 @@ export default function ItineraryPlanner() {
                 const t = await itineraryService.addIdea({ tripId: trip.id, title: "Nova ideia", category: "outro", durationMin: 60 });
                 setIdeas((arr) => [...arr, t]);
               }}
+              onEditIdea={(idea) => setEditingIdea(idea)}
             />
           </div>
 
