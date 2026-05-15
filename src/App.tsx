@@ -25,6 +25,7 @@ import Members from "./pages/trip/Members";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Sobre from "./pages/Sobre";
+import Wardrobe from "./pages/Wardrobe";
 import Notificacoes from "./pages/settings/Notificacoes";
 import Privacidade from "./pages/settings/Privacidade";
 import Idioma from "./pages/settings/Idioma";
