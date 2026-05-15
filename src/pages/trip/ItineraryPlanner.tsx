@@ -15,6 +15,14 @@ import { fmtBRL, minutesToLabel, minutesToHHmm } from "@/lib/format";
 import { addDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { EditIdeaModal } from "@/components/EditIdeaModal";
+import { ChevronDown, ChevronRight, Pencil, Backpack as BackpackIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  loadLooks, saveLooks, addLookToPacking, loadItems,
+  LOOK_SLOT_ORDER, CATEGORY_ICONS, type Look, type WardrobeItem,
+} from "@/lib/wardrobe-types";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 const HOUR_START = 6;   // 06:00
 const HOUR_END = 23;    // 23:00
