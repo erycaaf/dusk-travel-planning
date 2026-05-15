@@ -1,6 +1,6 @@
 // Service layer — abstracts data access so a real Supabase backend
 // can replace the mock store later without touching components.
-import { feed as feedSeed, expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
+import { expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
 import type { ActivityFeedItem, ActivityIdea, Expense, Flight, PackingItem, ScheduledActivity, Stay, Trip, TripMember, User, UserRole } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
@@ -13,12 +13,10 @@ const store = {
   scheduled: [...schSeed],
   expenses: [...expSeed],
   packing: [...pkSeed],
-  feed: [...feedSeed],
   users: [...users],
 };
 
 const wait = <T>(value: T) => Promise.resolve(value);
-const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
 // === Users (mock — still used by mock trip members until slice 3) ===
 export const usersService = {
@@ -232,7 +230,9 @@ export const tripsService = {
       .select(TRIP_SELECT)
       .single();
     if (error) throw error;
-    return rowToTrip(data as unknown as TripRow);
+    const newTrip = rowToTrip(data as unknown as TripRow);
+    recordFeedEvent(newTrip.id, `criou a viagem "${trip.name}"`).catch(() => {});
+    return newTrip;
   },
 
   updateNotes: async (tripId: string, notes: string): Promise<void> => {
@@ -343,7 +343,9 @@ export const flightsService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToFlight(data as FlightRow);
+    const flight = rowToFlight(data as FlightRow);
+    recordFeedEvent(f.tripId, `adicionou o voo ${f.airline} ${f.flightNumber} (${f.fromCode} → ${f.toCode})`).catch(() => {});
+    return flight;
   },
 
   remove: async (flightId: string): Promise<void> => {
@@ -404,7 +406,9 @@ export const staysService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToStay(data as StayRow);
+    const stay = rowToStay(data as StayRow);
+    recordFeedEvent(s.tripId, `adicionou hospedagem: ${s.name}`).catch(() => {});
+    return stay;
   },
 
   remove: async (stayId: string): Promise<void> => {
@@ -508,7 +512,9 @@ export const itineraryService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToIdea(data as IdeaRow);
+    const result = rowToIdea(data as IdeaRow);
+    recordFeedEvent(idea.tripId, `adicionou a ideia "${idea.title}" ao roteiro`).catch(() => {});
+    return result;
   },
 
   updateIdea: async (ideaId: string, patch: Partial<Omit<ActivityIdea, "id" | "tripId">>): Promise<ActivityIdea> => {
@@ -542,6 +548,8 @@ export const itineraryService = {
       .from("scheduled_activities")
       .upsert({ id: idea.id, trip_id: idea.tripId, date, start_min: startMin });
     if (error) throw error;
+    const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+    recordFeedEvent(idea.tripId, `agendou "${idea.title}" para ${dateLabel}`).catch(() => {});
     return { ...idea, date, startMin };
   },
 
@@ -615,7 +623,9 @@ export const expensesService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToExpense(data as ExpenseRow);
+    const expense = rowToExpense(data as ExpenseRow);
+    recordFeedEvent(e.tripId, `adicionou uma despesa: ${e.title} (${e.currency} ${e.amount.toLocaleString("pt-BR")})`).catch(() => {});
+    return expense;
   },
 
   remove: async (expenseId: string): Promise<void> => {
@@ -670,7 +680,9 @@ export const packingService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToPacking(data as PackingRow);
+    const item = rowToPacking(data as PackingRow);
+    recordFeedEvent(p.tripId, `adicionou "${p.name}" à lista de malas`).catch(() => {});
+    return item;
   },
 
   toggle: async (pid: string): Promise<void> => {
@@ -694,12 +706,53 @@ export const packingService = {
 };
 
 // === Feed ===
+type FeedRow = {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  text: string;
+  at: string;
+};
+
+const rowToFeedItem = (r: FeedRow): ActivityFeedItem => ({
+  id: r.id,
+  tripId: r.trip_id,
+  userId: r.user_id,
+  text: r.text,
+  at: r.at,
+});
+
+// Best-effort — never throws; called fire-and-forget after mutations
+async function recordFeedEvent(tripId: string, text: string): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("activity_feed").insert({ trip_id: tripId, user_id: user.id, text });
+  } catch {
+    // feed events are non-critical
+  }
+}
+
 export const feedService = {
-  byTrip: (tid: string) => wait(store.feed.filter((f) => f.tripId === tid).sort((a, b) => +new Date(b.at) - +new Date(a.at))),
-  add: (item: Omit<ActivityFeedItem, "id">) => {
-    const f: ActivityFeedItem = { ...item, id: id("fe") };
-    store.feed = [f, ...store.feed];
-    return wait(f);
+  byTrip: async (tid: string): Promise<ActivityFeedItem[]> => {
+    const { data, error } = await supabase
+      .from("activity_feed")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToFeedItem(r as FeedRow));
+  },
+
+  add: async (item: Omit<ActivityFeedItem, "id">): Promise<ActivityFeedItem> => {
+    const { data, error } = await supabase
+      .from("activity_feed")
+      .insert({ trip_id: item.tripId, user_id: item.userId, text: item.text })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToFeedItem(data as FeedRow);
   },
 };
 

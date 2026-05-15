@@ -148,23 +148,33 @@ export default function TripDashboard() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display font-semibold text-lg">Últimas atualizações</h2>
         </div>
-        <ul className="space-y-4">
-          {feed.map((f) => {
-            const u = userById(f.userId);
-            return (
-              <li key={f.id} className="flex gap-3 items-start">
-                <img src={u?.avatarUrl} alt={u?.name} className="w-9 h-9 rounded-full object-cover" loading="lazy" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">
-                    <span className="font-medium">{u?.name?.split(" ")[0]}</span>{" "}
-                    <span className="text-muted-foreground">{f.text}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">{fmtRelative(f.at)}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        {feed.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atualização ainda. As ações da viagem aparecerão aqui.</p>
+        ) : (
+          <ul className="space-y-4">
+            {feed.map((f) => {
+              const u = userById(f.userId);
+              return (
+                <li key={f.id} className="flex gap-3 items-start">
+                  {u?.avatarUrl ? (
+                    <img src={u.avatarUrl} alt={u.name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" loading="lazy" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                      {(u?.name ?? "?")[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm">
+                      <span className="font-medium">{u?.name?.split(" ")[0] ?? "Alguém"}</span>{" "}
+                      <span className="text-muted-foreground">{f.text}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{fmtRelative(f.at)}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
