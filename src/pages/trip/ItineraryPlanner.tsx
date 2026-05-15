@@ -477,3 +477,84 @@ export default function ItineraryPlanner() {
     </DndContext>
   );
 }
+
+// ---------- Looks do dia (wardrobe integration) ----------
+function DayLooksSection({ tripId, tripName, dayId }: { tripId: string; tripName: string; dayId: string }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(true);
+  const [looks, setLooks] = useState<Look[]>([]);
+  const [items, setItems] = useState<WardrobeItem[]>([]);
+
+  useEffect(() => {
+    setLooks(loadLooks());
+    setItems(loadItems());
+  }, [dayId]);
+
+  const dayLooks = looks.filter((l) => l.tripId === tripId && l.itineraryDayId === dayId);
+
+  const updateNotes = (id: string, notes: string) => {
+    const next = looks.map((l) => l.id === id ? { ...l, notes } : l);
+    setLooks(next); saveLooks(next);
+  };
+
+  const handleAddToPacking = (look: Look) => {
+    const n = addLookToPacking(tripId, look, items);
+    toast.success(n > 0
+      ? `${n} ${n === 1 ? "item adicionado" : "itens adicionados"} à mala de ${tripName}`
+      : `Itens já estavam na mala de ${tripName}`);
+  };
+
+  return (
+    <div className="rounded-2xl bg-card border border-border/60 overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors"
+      >
+        <span className="font-display font-semibold text-sm">Looks do dia <span className="text-muted-foreground font-normal">({dayLooks.length})</span></span>
+        {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-border/50 pt-3 animate-fade-in">
+          {dayLooks.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">Nenhum look associado a este dia.</p>
+          ) : dayLooks.map((look) => (
+            <div key={look.id} className="rounded-xl bg-muted/40 border border-border/50 p-3 space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1">
+                  {LOOK_SLOT_ORDER.slice(0, 5).map((cat) => {
+                    const slot = look.slots.find((s) => s.category === cat);
+                    const item = slot?.itemId ? items.find((i) => i.id === slot.itemId) : undefined;
+                    const Icon = CATEGORY_ICONS[cat];
+                    return (
+                      <div key={cat} className="h-9 w-9 rounded-md overflow-hidden bg-card border border-border/40">
+                        {item?.imageUrl
+                          ? <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-muted-foreground/60"><Icon className="h-3.5 w-3.5" /></div>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="font-display font-semibold flex-1 truncate">{look.name}</p>
+              </div>
+              <Textarea
+                value={look.notes ?? ""}
+                onChange={(e) => updateNotes(look.id, e.target.value)}
+                placeholder="Notas do look…"
+                rows={2}
+                className="text-sm bg-card"
+              />
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => navigate(`/wardrobe?look=${look.id}`)}>
+                  <Pencil className="h-3.5 w-3.5" /> Ver/editar look
+                </Button>
+                <Button size="sm" variant="soft" onClick={() => handleAddToPacking(look)}>
+                  <BackpackIcon className="h-3.5 w-3.5" /> Adicionar à mala
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
