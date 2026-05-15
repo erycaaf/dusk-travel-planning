@@ -156,7 +156,7 @@ export function AppShell() {
 
         {/* Bottom tabs (mobile) */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border">
-          <div className="grid grid-cols-5">
+          <div className={cn("grid", showTripNav ? "grid-cols-5" : "grid-cols-4")}>
             {mobileItems.map((it) => (
               <NavLink
                 key={it.to}
