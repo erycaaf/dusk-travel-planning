@@ -390,7 +390,22 @@ export default function Wardrobe() {
   const [editingLook, setEditingLook] = useState<Look | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
   useEffect(() => { setItems(loadItems()); setLooks(loadLooks()); tripsService.list().then(setTrips); }, []);
+
+  // Deep link: /wardrobe?look=ID opens that look in builder
+  useEffect(() => {
+    const lookId = searchParams.get("look");
+    if (!lookId || looks.length === 0) return;
+    const target = looks.find((l) => l.id === lookId);
+    if (target) {
+      setEditingLook(target);
+      setBuilderOpen(true);
+      searchParams.delete("look");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [looks, searchParams, setSearchParams]);
 
   const persistItems = (next: WardrobeItem[]) => { setItems(next); saveItems(next); };
   const persistLooks = (next: Look[]) => { setLooks(next); saveLooks(next); };
