@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { flightsService, tripsService } from "@/services";
-import type { Flight, Trip } from "@/lib/types";
+import { flightsService, groundTransportService, tripsService } from "@/services";
+import type { Flight, Ground, GroundType, Trip } from "@/lib/types";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,17 +10,6 @@ import { Plane, Plus, X, Trash2, Bus, Train, Car, Ship, Map as MapIcon, Check } 
 import { MapPlaceholder } from "@/components/MapPlaceholder";
 import { cn, errorMessage } from "@/lib/utils";
 import { toast } from "sonner";
-
-type GroundType = "onibus" | "trem" | "carro" | "ferry" | "outro";
-interface Ground {
-  id: string;
-  type: GroundType;
-  fromCity: string;
-  toCity: string;
-  departure: string;
-  arrival: string;
-  bookingCode?: string;
-}
 
 const GROUND_META: Record<GroundType, { label: string; icon: typeof Bus }> = {
   onibus: { label: "Ônibus", icon: Bus },
@@ -70,12 +59,12 @@ export default function TravelInfo() {
   const [grounds, setGrounds] = useState<Ground[]>([]);
   const [showGroundForm, setShowGroundForm] = useState(false);
   const [groundForm, setGroundForm] = useState(EMPTY_GROUND);
-
-  const groundsKey = id ? `dusk:trip:${id}:grounds` : "";
+  const [savingGround, setSavingGround] = useState(false);
 
   const load = () => {
     if (!id) return;
     flightsService.byTrip(id).then(setFlights).catch(() => {});
+    groundTransportService.byTrip(id).then(setGrounds).catch(() => {});
     tripsService.get(id).then((t) => {
       if (!t) return;
       setTrip(t);
@@ -85,20 +74,7 @@ export default function TravelInfo() {
     });
   };
 
-  useEffect(() => { load(); }, [id]);
-
-  useEffect(() => {
-    if (!id) return;
-    try {
-      const g = localStorage.getItem(groundsKey);
-      if (g) setGrounds(JSON.parse(g));
-    } catch { /* ignore */ }
-  }, [id, groundsKey]);
-
-  const persistGrounds = (next: Ground[]) => {
-    setGrounds(next);
-    try { localStorage.setItem(groundsKey, JSON.stringify(next)); } catch { /* ignore */ }
-  };
+  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveNotes = async () => {
     if (!id) return;
@@ -117,26 +93,38 @@ export default function TravelInfo() {
 
   const canSaveGround = groundForm.fromCity && groundForm.toCity && groundForm.departure && groundForm.arrival;
 
-  const saveGround = () => {
-    if (!canSaveGround) return;
-    const next: Ground = {
-      id: `gr-${Date.now().toString(36)}`,
-      type: groundForm.type,
-      fromCity: groundForm.fromCity,
-      toCity: groundForm.toCity,
-      departure: groundForm.departure,
-      arrival: groundForm.arrival,
-      bookingCode: groundForm.bookingCode || undefined,
-    };
-    persistGrounds([...grounds, next]);
-    setGroundForm(EMPTY_GROUND);
-    setShowGroundForm(false);
-    toast.success("Transporte adicionado!");
+  const saveGround = async () => {
+    if (!id || !canSaveGround) return;
+    setSavingGround(true);
+    try {
+      const added = await groundTransportService.add({
+        tripId: id,
+        type: groundForm.type,
+        fromCity: groundForm.fromCity,
+        toCity: groundForm.toCity,
+        departure: groundForm.departure,
+        arrival: groundForm.arrival,
+        bookingCode: groundForm.bookingCode || undefined,
+      });
+      setGrounds((prev) => [...prev, added]);
+      setGroundForm(EMPTY_GROUND);
+      setShowGroundForm(false);
+      toast.success("Transporte adicionado!");
+    } catch (err) {
+      toast.error(errorMessage(err, "Erro ao salvar transporte"));
+    } finally {
+      setSavingGround(false);
+    }
   };
 
-  const removeGround = (gid: string) => {
-    persistGrounds(grounds.filter((g) => g.id !== gid));
-    toast.success("Transporte removido.");
+  const removeGround = async (gid: string) => {
+    try {
+      await groundTransportService.remove(gid);
+      setGrounds((prev) => prev.filter((g) => g.id !== gid));
+      toast.success("Transporte removido.");
+    } catch (err) {
+      toast.error(errorMessage(err, "Erro ao remover transporte"));
+    }
   };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -425,7 +413,9 @@ export default function TravelInfo() {
 
               <div className="flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => { setShowGroundForm(false); setGroundForm(EMPTY_GROUND); }}>Cancelar</Button>
-                <Button variant="sunset" onClick={saveGround} disabled={!canSaveGround}>Salvar transporte</Button>
+                <Button variant="sunset" onClick={saveGround} disabled={!canSaveGround || savingGround}>
+                  {savingGround ? "Salvando..." : "Salvar transporte"}
+                </Button>
               </div>
             </div>
           )}

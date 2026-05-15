@@ -1,7 +1,7 @@
 // Service layer — abstracts data access so a real Supabase backend
 // can replace the mock store later without touching components.
 import { coverGallery, expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
-import type { ActivityFeedItem, ActivityIdea, Expense, Flight, PackingItem, ScheduledActivity, Stay, Trip, TripMember, User, UserRole } from "@/lib/types";
+import type { ActivityFeedItem, ActivityIdea, Expense, Flight, Ground, GroundType, PackingItem, ScheduledActivity, Stay, Trip, TripMember, User, UserRole } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
 // In-memory store (lives for the session)
@@ -740,6 +740,66 @@ export const packingService = {
 
   remove: async (pid: string): Promise<void> => {
     const { error } = await supabase.from("packing_items").delete().eq("id", pid);
+    if (error) throw error;
+  },
+};
+
+// === Ground Transport (Supabase) ===
+type GroundRow = {
+  id: string;
+  trip_id: string;
+  type: string;
+  from_city: string;
+  to_city: string;
+  departure: string;
+  arrival: string;
+  booking_code: string | null;
+};
+
+const rowToGround = (r: GroundRow): Ground => ({
+  id: r.id,
+  tripId: r.trip_id,
+  type: r.type as GroundType,
+  fromCity: r.from_city,
+  toCity: r.to_city,
+  departure: r.departure,
+  arrival: r.arrival,
+  bookingCode: r.booking_code ?? undefined,
+});
+
+export const groundTransportService = {
+  byTrip: async (tripId: string): Promise<Ground[]> => {
+    const { data, error } = await supabase
+      .from("ground_transport")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("departure", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToGround(r as GroundRow));
+  },
+
+  add: async (g: Omit<Ground, "id">): Promise<Ground> => {
+    const { data, error } = await supabase
+      .from("ground_transport")
+      .insert({
+        trip_id: g.tripId,
+        type: g.type,
+        from_city: g.fromCity,
+        to_city: g.toCity,
+        departure: g.departure,
+        arrival: g.arrival,
+        booking_code: g.bookingCode ?? null,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    const ground = rowToGround(data as GroundRow);
+    recordFeedEvent(g.tripId, `adicionou transporte terrestre: ${g.fromCity} → ${g.toCity}`).catch(() => {});
+    return ground;
+  },
+
+  remove: async (groundId: string): Promise<void> => {
+    const { error } = await supabase.from("ground_transport").delete().eq("id", groundId);
     if (error) throw error;
   },
 };
