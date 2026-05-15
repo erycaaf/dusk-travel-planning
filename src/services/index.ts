@@ -253,6 +253,35 @@ export const tripsService = {
     if (error) throw error;
   },
 
+  update: async (tripId: string, patch: Partial<Omit<Trip, "id" | "members">>): Promise<Trip> => {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.country !== undefined) dbPatch.country = patch.country;
+    if (patch.city !== undefined) dbPatch.city = patch.city;
+    if (patch.originCity !== undefined) dbPatch.origin_city = patch.originCity;
+    if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
+    if (patch.endDate !== undefined) dbPatch.end_date = patch.endDate;
+    if (patch.coverUrl !== undefined) dbPatch.cover_url = patch.coverUrl;
+    if (patch.status !== undefined) dbPatch.status = patch.status;
+    if (patch.styles !== undefined) dbPatch.styles = patch.styles;
+    if (patch.budget !== undefined) dbPatch.budget = patch.budget ?? null;
+
+    const { data, error } = await supabase
+      .from("trips")
+      .update(dbPatch)
+      .eq("id", tripId)
+      .select(TRIP_SELECT)
+      .single();
+    if (error) throw error;
+    recordFeedEvent(tripId, "editou os detalhes da viagem").catch(() => {});
+    return rowToTrip(data as unknown as TripRow);
+  },
+
+  remove: async (tripId: string): Promise<void> => {
+    const { error } = await supabase.from("trips").delete().eq("id", tripId);
+    if (error) throw error;
+  },
+
   /** Add a member by looking up their email in profiles. Throws if no match. */
   addMemberByEmail: async (tripId: string, email: string, role: UserRole = "editor") => {
     const normalized = email.trim().toLowerCase();
