@@ -402,6 +402,8 @@ export default function ItineraryPlanner() {
               onClickItem={setEditing}
               conflicts={conflicts}
             />
+
+            <DayLooksSection tripId={trip.id} tripName={trip.name} dayId={selectedDate} />
           </div>
         </div>
       </div>
