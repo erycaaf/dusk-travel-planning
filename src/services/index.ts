@@ -1,6 +1,6 @@
 // Service layer — abstracts data access so a real Supabase backend
 // can replace the mock store later without touching components.
-import { expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
+import { coverGallery, expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
 import type { ActivityFeedItem, ActivityIdea, Expense, Flight, PackingItem, ScheduledActivity, Stay, Trip, TripMember, User, UserRole } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
@@ -159,6 +159,16 @@ type TripRow = {
   }>;
 };
 
+// "gallery:mendoza" → URL local do asset; URLs absolutas passam direto
+function resolveGalleryCover(raw: string | null): string {
+  if (!raw) return "";
+  if (raw.startsWith("gallery:")) {
+    const galleryId = raw.slice("gallery:".length);
+    return coverGallery.find((c) => c.id === galleryId)?.url ?? "";
+  }
+  return raw;
+}
+
 const rowToTrip = (row: TripRow): Trip => ({
   id: row.id,
   name: row.name,
@@ -167,7 +177,7 @@ const rowToTrip = (row: TripRow): Trip => ({
   originCity: row.origin_city ?? undefined,
   startDate: row.start_date,
   endDate: row.end_date,
-  coverUrl: row.cover_url ?? "",
+  coverUrl: resolveGalleryCover(row.cover_url),
   status: row.status,
   styles: row.styles ?? [],
   budget: row.budget ?? undefined,

@@ -91,9 +91,11 @@ export default function NewTrip() {
   const submit = async () => {
     setCreating(true);
     try {
-      let coverUrl = cover.url;
+      let coverUrl: string;
       if (coverId === "custom" && customCover?.file) {
         coverUrl = await storageService.uploadCover(customCover.file);
+      } else {
+        coverUrl = `gallery:${coverId}`;
       }
 
       const trip = await tripsService.create({
