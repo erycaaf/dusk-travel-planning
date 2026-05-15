@@ -97,6 +97,7 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/sobre" element={<Sobre />} />
+            <Route path="/wardrobe" element={<Wardrobe />} />
             <Route path="/settings/notificacoes" element={<Notificacoes />} />
             <Route path="/settings/privacidade" element={<Privacidade />} />
             <Route path="/settings/idioma" element={<Idioma />} />
