@@ -969,22 +969,32 @@ export const authService = {
     });
   },
   signInWithPassword: async (email: string, password: string) => {
-    return supabase.auth.signInWithPassword({
+    const result = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
+    if (!result.error) {
+      supabase.auth.updateUser({ data: { has_password: true } });
+    }
+    return result;
   },
 
   signUpWithPassword: async (email: string, password: string) => {
     return supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
-      options: { emailRedirectTo: `${window.location.origin}/trips` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/trips`,
+        data: { has_password: true },
+      },
     });
   },
 
   updatePassword: async (newPassword: string): Promise<void> => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+      data: { has_password: true },
+    });
     if (error) throw error;
   },
 

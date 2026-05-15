@@ -1,18 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authService } from "@/services";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 export default function Seguranca() {
   const nav = useNavigate();
+  const [formOpen, setFormOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hasPassword, setHasPassword] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setHasPassword(!!data.user?.user_metadata?.has_password);
+    });
+  }, []);
 
   const mismatch = confirm.length > 0 && password !== confirm;
   const canSave = password.length >= 6 && password === confirm;
@@ -25,6 +34,8 @@ export default function Seguranca() {
       toast.success("Senha salva com sucesso!");
       setPassword("");
       setConfirm("");
+      setFormOpen(false);
+      setHasPassword(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro ao salvar senha");
     } finally {
@@ -55,50 +66,64 @@ export default function Seguranca() {
         <div className="px-5 py-3 border-b border-border/50">
           <p className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Definir / alterar senha</p>
         </div>
-        <div className="p-5 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-password">Nova senha</Label>
-            <div className="relative">
-              <Input
-                id="new-password"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="mínimo 6 caracteres"
-                autoComplete="new-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+        <div className="p-5">
+          {!formOpen ? (
+            <Button variant="outline" className="w-full" onClick={() => setFormOpen(true)}>
+              Definir / alterar senha
+            </Button>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nova senha</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="mínimo 6 caracteres"
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {password.length > 0 && password.length < 6 && (
+                  <p className="text-xs text-destructive">Mínimo de 6 caracteres.</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirmar nova senha</Label>
+                <Input
+                  id="confirm-password"
+                  type={showPassword ? "text" : "password"}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="repita a senha"
+                  autoComplete="new-password"
+                />
+                {mismatch && (
+                  <p className="text-xs text-destructive">As senhas não coincidem.</p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setFormOpen(false); setPassword(""); setConfirm(""); }}>
+                  Cancelar
+                </Button>
+                <Button variant="sunset" onClick={handleSave} disabled={!canSave || saving} className="flex-1">
+                  {saving ? "Salvando..." : "Salvar senha"}
+                </Button>
+              </div>
             </div>
-            {password.length > 0 && password.length < 6 && (
-              <p className="text-xs text-destructive">Mínimo de 6 caracteres.</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirmar nova senha</Label>
-            <Input
-              id="confirm-password"
-              type={showPassword ? "text" : "password"}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="repita a senha"
-              autoComplete="new-password"
-            />
-            {mismatch && (
-              <p className="text-xs text-destructive">As senhas não coincidem.</p>
-            )}
-          </div>
-
-          <Button variant="sunset" onClick={handleSave} disabled={!canSave || saving} className="w-full">
-            {saving ? "Salvando..." : "Salvar senha"}
-          </Button>
+          )}
         </div>
       </section>
 
@@ -115,6 +140,15 @@ export default function Seguranca() {
             </div>
             <span className="text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">Ativo</span>
           </li>
+          {hasPassword && (
+            <li className="px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">Email e senha</p>
+                <p className="text-xs text-muted-foreground">Acesso com email e senha definida</p>
+              </div>
+              <span className="text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">Ativo</span>
+            </li>
+          )}
         </ul>
       </section>
     </div>
