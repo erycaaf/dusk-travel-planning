@@ -1,7 +1,7 @@
 // Service layer — abstracts data access so a real Supabase backend
 // can replace the mock store later without touching components.
-import { feed as feedSeed, expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
-import type { ActivityFeedItem, ActivityIdea, Expense, Flight, PackingItem, ScheduledActivity, Stay, Trip, TripMember, User, UserRole } from "@/lib/types";
+import { coverGallery, expenses as expSeed, flights as flSeed, ideas as ideaSeed, packing as pkSeed, scheduled as schSeed, stays as staySeed, trips as tripSeed, users } from "@/lib/mock-data";
+import type { ActivityFeedItem, ActivityIdea, Expense, Flight, Ground, GroundType, PackingItem, ScheduledActivity, Stay, Trip, TripMember, User, UserRole } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 
 // In-memory store (lives for the session)
@@ -13,12 +13,10 @@ const store = {
   scheduled: [...schSeed],
   expenses: [...expSeed],
   packing: [...pkSeed],
-  feed: [...feedSeed],
   users: [...users],
 };
 
 const wait = <T>(value: T) => Promise.resolve(value);
-const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
 // === Users (mock — still used by mock trip members until slice 3) ===
 export const usersService = {
@@ -161,6 +159,16 @@ type TripRow = {
   }>;
 };
 
+// "gallery:mendoza" → URL local do asset; URLs absolutas passam direto
+function resolveGalleryCover(raw: string | null): string {
+  if (!raw) return "";
+  if (raw.startsWith("gallery:")) {
+    const galleryId = raw.slice("gallery:".length);
+    return coverGallery.find((c) => c.id === galleryId)?.url ?? "";
+  }
+  return raw;
+}
+
 const rowToTrip = (row: TripRow): Trip => ({
   id: row.id,
   name: row.name,
@@ -169,7 +177,7 @@ const rowToTrip = (row: TripRow): Trip => ({
   originCity: row.origin_city ?? undefined,
   startDate: row.start_date,
   endDate: row.end_date,
-  coverUrl: row.cover_url ?? "",
+  coverUrl: resolveGalleryCover(row.cover_url),
   status: row.status,
   styles: row.styles ?? [],
   budget: row.budget ?? undefined,
@@ -232,7 +240,9 @@ export const tripsService = {
       .select(TRIP_SELECT)
       .single();
     if (error) throw error;
-    return rowToTrip(data as unknown as TripRow);
+    const newTrip = rowToTrip(data as unknown as TripRow);
+    recordFeedEvent(newTrip.id, `criou a viagem "${trip.name}"`).catch(() => {});
+    return newTrip;
   },
 
   updateNotes: async (tripId: string, notes: string): Promise<void> => {
@@ -240,6 +250,35 @@ export const tripsService = {
       .from("trips")
       .update({ notes })
       .eq("id", tripId);
+    if (error) throw error;
+  },
+
+  update: async (tripId: string, patch: Partial<Omit<Trip, "id" | "members">>): Promise<Trip> => {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.country !== undefined) dbPatch.country = patch.country;
+    if (patch.city !== undefined) dbPatch.city = patch.city;
+    if (patch.originCity !== undefined) dbPatch.origin_city = patch.originCity;
+    if (patch.startDate !== undefined) dbPatch.start_date = patch.startDate;
+    if (patch.endDate !== undefined) dbPatch.end_date = patch.endDate;
+    if (patch.coverUrl !== undefined) dbPatch.cover_url = patch.coverUrl;
+    if (patch.status !== undefined) dbPatch.status = patch.status;
+    if (patch.styles !== undefined) dbPatch.styles = patch.styles;
+    if (patch.budget !== undefined) dbPatch.budget = patch.budget ?? null;
+
+    const { data, error } = await supabase
+      .from("trips")
+      .update(dbPatch)
+      .eq("id", tripId)
+      .select(TRIP_SELECT)
+      .single();
+    if (error) throw error;
+    recordFeedEvent(tripId, "editou os detalhes da viagem").catch(() => {});
+    return rowToTrip(data as unknown as TripRow);
+  },
+
+  remove: async (tripId: string): Promise<void> => {
+    const { error } = await supabase.from("trips").delete().eq("id", tripId);
     if (error) throw error;
   },
 
@@ -343,7 +382,9 @@ export const flightsService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToFlight(data as FlightRow);
+    const flight = rowToFlight(data as FlightRow);
+    recordFeedEvent(f.tripId, `adicionou o voo ${f.airline} ${f.flightNumber} (${f.fromCode} → ${f.toCode})`).catch(() => {});
+    return flight;
   },
 
   remove: async (flightId: string): Promise<void> => {
@@ -404,7 +445,9 @@ export const staysService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToStay(data as StayRow);
+    const stay = rowToStay(data as StayRow);
+    recordFeedEvent(s.tripId, `adicionou hospedagem: ${s.name}`).catch(() => {});
+    return stay;
   },
 
   remove: async (stayId: string): Promise<void> => {
@@ -508,7 +551,9 @@ export const itineraryService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToIdea(data as IdeaRow);
+    const result = rowToIdea(data as IdeaRow);
+    recordFeedEvent(idea.tripId, `adicionou a ideia "${idea.title}" ao roteiro`).catch(() => {});
+    return result;
   },
 
   updateIdea: async (ideaId: string, patch: Partial<Omit<ActivityIdea, "id" | "tripId">>): Promise<ActivityIdea> => {
@@ -542,6 +587,8 @@ export const itineraryService = {
       .from("scheduled_activities")
       .upsert({ id: idea.id, trip_id: idea.tripId, date, start_min: startMin });
     if (error) throw error;
+    const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+    recordFeedEvent(idea.tripId, `agendou "${idea.title}" para ${dateLabel}`).catch(() => {});
     return { ...idea, date, startMin };
   },
 
@@ -615,7 +662,9 @@ export const expensesService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToExpense(data as ExpenseRow);
+    const expense = rowToExpense(data as ExpenseRow);
+    recordFeedEvent(e.tripId, `adicionou uma despesa: ${e.title} (${e.currency} ${e.amount.toLocaleString("pt-BR")})`).catch(() => {});
+    return expense;
   },
 
   remove: async (expenseId: string): Promise<void> => {
@@ -670,7 +719,9 @@ export const packingService = {
       .select("*")
       .single();
     if (error) throw error;
-    return rowToPacking(data as PackingRow);
+    const item = rowToPacking(data as PackingRow);
+    recordFeedEvent(p.tripId, `adicionou "${p.name}" à lista de malas`).catch(() => {});
+    return item;
   },
 
   toggle: async (pid: string): Promise<void> => {
@@ -693,13 +744,177 @@ export const packingService = {
   },
 };
 
+// === Ground Transport (Supabase) ===
+type GroundRow = {
+  id: string;
+  trip_id: string;
+  type: string;
+  from_city: string;
+  to_city: string;
+  departure: string;
+  arrival: string;
+  booking_code: string | null;
+};
+
+const rowToGround = (r: GroundRow): Ground => ({
+  id: r.id,
+  tripId: r.trip_id,
+  type: r.type as GroundType,
+  fromCity: r.from_city,
+  toCity: r.to_city,
+  departure: r.departure,
+  arrival: r.arrival,
+  bookingCode: r.booking_code ?? undefined,
+});
+
+export const groundTransportService = {
+  byTrip: async (tripId: string): Promise<Ground[]> => {
+    const { data, error } = await supabase
+      .from("ground_transport")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("departure", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToGround(r as GroundRow));
+  },
+
+  add: async (g: Omit<Ground, "id">): Promise<Ground> => {
+    const { data, error } = await supabase
+      .from("ground_transport")
+      .insert({
+        trip_id: g.tripId,
+        type: g.type,
+        from_city: g.fromCity,
+        to_city: g.toCity,
+        departure: g.departure,
+        arrival: g.arrival,
+        booking_code: g.bookingCode ?? null,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    const ground = rowToGround(data as GroundRow);
+    recordFeedEvent(g.tripId, `adicionou transporte terrestre: ${g.fromCity} → ${g.toCity}`).catch(() => {});
+    return ground;
+  },
+
+  remove: async (groundId: string): Promise<void> => {
+    const { error } = await supabase.from("ground_transport").delete().eq("id", groundId);
+    if (error) throw error;
+  },
+};
+
+// === Invites ===
+export const invitesService = {
+  create: async (tripId: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+    const { data, error } = await supabase
+      .from("trip_invites")
+      .insert({ trip_id: tripId, created_by: user.id })
+      .select("code")
+      .single();
+    if (error) throw error;
+    return (data as { code: string }).code;
+  },
+
+  getByCode: async (code: string): Promise<{
+    tripId: string;
+    tripName: string;
+    tripCoverUrl: string;
+    tripCity: string;
+    tripCountry: string;
+  } | null> => {
+    const { data, error } = await supabase
+      .from("trip_invites")
+      .select("trip_id, trips(name, cover_url, city, country)")
+      .eq("code", code)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as { trip_id: string; trips: { name: string; cover_url: string | null; city: string; country: string } | null };
+    const t = row.trips;
+    return {
+      tripId: data.trip_id,
+      tripName: t?.name ?? "",
+      tripCoverUrl: resolveGalleryCover(t?.cover_url ?? null),
+      tripCity: t?.city ?? "",
+      tripCountry: t?.country ?? "",
+    };
+  },
+
+  accept: async (code: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Faça login primeiro.");
+
+    const { data: invite, error: e1 } = await supabase
+      .from("trip_invites")
+      .select("trip_id")
+      .eq("code", code)
+      .maybeSingle();
+    if (e1) throw e1;
+    if (!invite) throw new Error("Convite inválido ou expirado.");
+
+    const { error: e2 } = await supabase
+      .from("trip_members")
+      .insert({ trip_id: (invite as { trip_id: string }).trip_id, user_id: user.id, role: "editor" });
+    if (e2) {
+      if (e2.code === "23505") throw new Error("Você já é membro desta viagem.");
+      throw e2;
+    }
+
+    return (invite as { trip_id: string }).trip_id;
+  },
+};
+
 // === Feed ===
+type FeedRow = {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  text: string;
+  at: string;
+};
+
+const rowToFeedItem = (r: FeedRow): ActivityFeedItem => ({
+  id: r.id,
+  tripId: r.trip_id,
+  userId: r.user_id,
+  text: r.text,
+  at: r.at,
+});
+
+// Best-effort — never throws; called fire-and-forget after mutations
+async function recordFeedEvent(tripId: string, text: string): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("activity_feed").insert({ trip_id: tripId, user_id: user.id, text });
+  } catch {
+    // feed events are non-critical
+  }
+}
+
 export const feedService = {
-  byTrip: (tid: string) => wait(store.feed.filter((f) => f.tripId === tid).sort((a, b) => +new Date(b.at) - +new Date(a.at))),
-  add: (item: Omit<ActivityFeedItem, "id">) => {
-    const f: ActivityFeedItem = { ...item, id: id("fe") };
-    store.feed = [f, ...store.feed];
-    return wait(f);
+  byTrip: async (tid: string): Promise<ActivityFeedItem[]> => {
+    const { data, error } = await supabase
+      .from("activity_feed")
+      .select("*")
+      .eq("trip_id", tid)
+      .order("at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return (data ?? []).map((r) => rowToFeedItem(r as FeedRow));
+  },
+
+  add: async (item: Omit<ActivityFeedItem, "id">): Promise<ActivityFeedItem> => {
+    const { data, error } = await supabase
+      .from("activity_feed")
+      .insert({ trip_id: item.tripId, user_id: item.userId, text: item.text })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return rowToFeedItem(data as FeedRow);
   },
 };
 
@@ -753,6 +968,44 @@ export const authService = {
       },
     });
   },
+  signInWithPassword: async (email: string, password: string) => {
+    const result = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+    if (!result.error) {
+      supabase.auth.updateUser({ data: { has_password: true } });
+    }
+    return result;
+  },
+
+  signUpWithPassword: async (email: string, password: string) => {
+    return supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/trips`,
+        data: { has_password: true },
+      },
+    });
+  },
+
+  updatePassword: async (newPassword: string): Promise<void> => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+      data: { has_password: true },
+    });
+    if (error) throw error;
+  },
+
+  sendPasswordReset: async (email: string): Promise<void> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: `${window.location.origin}/settings/seguranca` },
+    );
+    if (error) throw error;
+  },
+
   signOut: async () => {
     await supabase.auth.signOut();
   },

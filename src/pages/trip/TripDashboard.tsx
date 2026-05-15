@@ -1,17 +1,25 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { expensesService, feedService, flightsService, itineraryService, packingService, staysService, tripsService } from "@/services";
 import type { ActivityFeedItem, Expense, Flight, PackingItem, ScheduledActivity, Stay, Trip, User } from "@/lib/types";
 import { GradientHero } from "@/components/GradientHero";
 import { TravelerAvatarGroup } from "@/components/TravelerAvatarGroup";
 import { StatCard } from "@/components/StatCard";
-import { Plane, Hotel, Calendar, Wallet, Backpack, MapPin, Plus, ArrowRight } from "lucide-react";
+import { EditTripModal } from "@/components/EditTripModal";
+import { Plane, Hotel, Calendar, Wallet, Backpack, MapPin, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { fmtBRL, fmtDateRange, fmtRelative, fmtTime, daysUntil, tripDuration } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 export default function TripDashboard() {
   const { id } = useParams();
+  const nav = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [members, setMembers] = useState<User[]>([]);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [stays, setStays] = useState<Stay[]>([]);
@@ -51,6 +59,19 @@ export default function TripDashboard() {
 
   const userById = (uid: string) => members.find((m) => m.id === uid);
 
+  const handleDelete = async () => {
+    if (!trip) return;
+    setDeleting(true);
+    try {
+      await tripsService.remove(trip.id);
+      toast.success("Viagem excluída");
+      nav("/trips", { replace: true });
+    } catch {
+      toast.error("Erro ao excluir viagem");
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="container max-w-6xl py-6 space-y-6">
       {/* Hero */}
@@ -62,8 +83,26 @@ export default function TripDashboard() {
             <p className="flex items-center gap-2 text-white/90"><MapPin className="h-4 w-4" /> {trip.city}, {trip.country}</p>
           </div>
           <div className="flex flex-col items-start sm:items-end gap-3">
-            <div className="rounded-full bg-white/15 backdrop-blur px-4 py-2 text-sm font-medium">
-              {days > 0 ? `faltam ${days} dias` : days === 0 ? "começa hoje" : "em curso"}
+            <div className="flex items-center gap-2">
+              <div className="rounded-full bg-white/15 backdrop-blur px-4 py-2 text-sm font-medium">
+                {days > 0 ? `faltam ${days} dias` : days === 0 ? "começa hoje" : "em curso"}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full bg-white/15 backdrop-blur text-white hover:bg-white/25 h-9 w-9">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <Pencil className="h-4 w-4 mr-2" /> Editar viagem
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-destructive focus:text-destructive">
+                    <Trash2 className="h-4 w-4 mr-2" /> Excluir viagem
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <TravelerAvatarGroup users={members} size={36} ringClass="ring-white/80" />
           </div>
@@ -148,24 +187,63 @@ export default function TripDashboard() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display font-semibold text-lg">Últimas atualizações</h2>
         </div>
-        <ul className="space-y-4">
-          {feed.map((f) => {
-            const u = userById(f.userId);
-            return (
-              <li key={f.id} className="flex gap-3 items-start">
-                <img src={u?.avatarUrl} alt={u?.name} className="w-9 h-9 rounded-full object-cover" loading="lazy" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">
-                    <span className="font-medium">{u?.name?.split(" ")[0]}</span>{" "}
-                    <span className="text-muted-foreground">{f.text}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">{fmtRelative(f.at)}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        {feed.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma atualização ainda. As ações da viagem aparecerão aqui.</p>
+        ) : (
+          <ul className="space-y-4">
+            {feed.map((f) => {
+              const u = userById(f.userId);
+              return (
+                <li key={f.id} className="flex gap-3 items-start">
+                  {u?.avatarUrl ? (
+                    <img src={u.avatarUrl} alt={u.name} className="w-9 h-9 rounded-full object-cover flex-shrink-0" loading="lazy" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-primary/20 text-primary flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                      {(u?.name ?? "?")[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm">
+                      <span className="font-medium">{u?.name?.split(" ")[0] ?? "Alguém"}</span>{" "}
+                      <span className="text-muted-foreground">{f.text}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">{fmtRelative(f.at)}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
+      {/* Edit modal */}
+      <EditTripModal
+        trip={trip}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={(updated) => setTrip(updated)}
+      />
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir "{trip.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. Voos, hospedagens, despesas, malas e roteiro serão apagados permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Sim, excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

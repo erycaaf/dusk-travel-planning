@@ -25,6 +25,11 @@ import Members from "./pages/trip/Members";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Sobre from "./pages/Sobre";
+import Notificacoes from "./pages/settings/Notificacoes";
+import Privacidade from "./pages/settings/Privacidade";
+import Idioma from "./pages/settings/Idioma";
+import Seguranca from "./pages/settings/Seguranca";
+import Invite from "./pages/Invite";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +96,11 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/sobre" element={<Sobre />} />
+            <Route path="/settings/notificacoes" element={<Notificacoes />} />
+            <Route path="/settings/privacidade" element={<Privacidade />} />
+            <Route path="/settings/idioma" element={<Idioma />} />
+            <Route path="/settings/seguranca" element={<Seguranca />} />
+            <Route path="/invite/:code" element={<Invite />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

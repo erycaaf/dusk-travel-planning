@@ -1,13 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, User, Bell, Lock, Languages, Info, LogOut } from "lucide-react";
+import { ChevronRight, User, Bell, Lock, Languages, Info, LogOut, ShieldCheck } from "lucide-react";
 import { authService } from "@/services";
 import { toast } from "sonner";
 
 const items = [
   { to: "/profile", label: "Perfil", icon: User },
-  { to: "#", label: "Notificações", icon: Bell },
-  { to: "#", label: "Privacidade", icon: Lock },
-  { to: "#", label: "Idioma", icon: Languages },
+  { to: "/settings/notificacoes", label: "Notificações", icon: Bell },
+  { to: "/settings/privacidade", label: "Privacidade", icon: Lock },
+  { to: "/settings/seguranca", label: "Login e segurança", icon: ShieldCheck },
+  { to: "/settings/idioma", label: "Idioma", icon: Languages },
   { to: "/settings/sobre", label: "Sobre o Dusk", icon: Info },
 ];
 

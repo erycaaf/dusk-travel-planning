@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { tripsService } from "@/services";
+import { invitesService, tripsService } from "@/services";
 import type { Trip, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Plus, X } from "lucide-react";
+import { Copy, Link2, Mail, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -20,6 +20,8 @@ export default function Members() {
   const { id } = useParams();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [open, setOpen] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
 
   const load = () => {
     if (!id) return;
@@ -27,6 +29,26 @@ export default function Members() {
   };
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const generateLink = async () => {
+    if (!id) return;
+    setGeneratingLink(true);
+    try {
+      const code = await invitesService.create(id);
+      const url = `${window.location.origin}/invite/${code}`;
+      setInviteLink(url);
+    } catch {
+      toast.error("Erro ao gerar link");
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const copyLink = () => {
+    if (!inviteLink) return;
+    navigator.clipboard.writeText(inviteLink);
+    toast.success("Link copiado!");
+  };
 
   if (!trip) return <div className="container py-8"><div className="h-64 shimmer rounded-2xl" /></div>;
 
@@ -37,8 +59,31 @@ export default function Members() {
           <h1 className="font-display font-semibold text-2xl sm:text-3xl">Viajantes</h1>
           <p className="text-muted-foreground text-sm">Quem está nessa com você.</p>
         </div>
-        <Button variant="sunset" onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Convidar</Button>
+        <Button variant="sunset" onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> Convidar por email</Button>
       </header>
+
+      {/* Invite link section */}
+      <div className="rounded-2xl bg-card border border-border/50 p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-primary" />
+          <p className="font-medium text-sm">Link de convite</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Qualquer pessoa com esse link pode entrar na viagem como editora — mesmo sem ter conta ainda.
+        </p>
+        {inviteLink ? (
+          <div className="flex gap-2">
+            <Input value={inviteLink} readOnly className="text-xs font-mono" />
+            <Button variant="outline" size="icon" onClick={copyLink} aria-label="Copiar link">
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={generateLink} disabled={generatingLink}>
+            {generatingLink ? "Gerando..." : "Gerar link de convite"}
+          </Button>
+        )}
+      </div>
 
       <div className="grid sm:grid-cols-2 gap-4">
         {trip.members.map((m) => {

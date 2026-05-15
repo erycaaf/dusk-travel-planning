@@ -150,6 +150,19 @@ export interface PackingItem {
   packed: boolean;
 }
 
+export type GroundType = "onibus" | "trem" | "carro" | "ferry" | "outro";
+
+export interface Ground {
+  id: string;
+  tripId: string;
+  type: GroundType;
+  fromCity: string;
+  toCity: string;
+  departure: string; // ISO
+  arrival: string;   // ISO
+  bookingCode?: string;
+}
+
 export interface ActivityFeedItem {
   id: string;
   tripId: string;
