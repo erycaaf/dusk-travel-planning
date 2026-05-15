@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
-import { Home, MapPin, Calendar, Wallet, Backpack, Users, User, Settings, Hotel, Plane } from "lucide-react";
+import { Home, MapPin, Calendar, Wallet, Backpack, Users, User, Settings, Hotel, Plane, Shirt } from "lucide-react";
 import { DuskLogo } from "@/components/DuskLogo";
 import { cn } from "@/lib/utils";
 import { TravelerAvatarGroup } from "@/components/TravelerAvatarGroup";
@@ -20,9 +20,10 @@ const tripNav = (tripId: string) => [
 ];
 
 const baseNav = [
-  { to: "/trips",    label: "Viagens", icon: MapPin, end: true },
-  { to: "/profile",  label: "Perfil",  icon: User },
-  { to: "/settings", label: "Ajustes", icon: Settings },
+  { to: "/trips",    label: "Viagens",      icon: MapPin, end: true },
+  { to: "/wardrobe", label: "Guarda-roupa", icon: Shirt },
+  { to: "/profile",  label: "Perfil",       icon: User },
+  { to: "/settings", label: "Ajustes",      icon: Settings },
 ];
 
 export function AppShell() {
@@ -65,9 +66,10 @@ export function AppShell() {
         { to: "/profile",                   label: "Perfil",  icon: User },
       ]
     : [
-        { to: "/trips",    label: "Viagens", icon: MapPin, end: true },
-        { to: "/profile",  label: "Perfil",  icon: User },
-        { to: "/settings", label: "Ajustes", icon: Settings },
+        { to: "/trips",    label: "Viagens",      icon: MapPin, end: true },
+        { to: "/wardrobe", label: "Guarda-roupa", icon: Shirt },
+        { to: "/profile",  label: "Perfil",       icon: User },
+        { to: "/settings", label: "Ajustes",      icon: Settings },
       ];
 
   return (
@@ -154,7 +156,7 @@ export function AppShell() {
 
         {/* Bottom tabs (mobile) */}
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border">
-          <div className="grid grid-cols-5">
+          <div className={cn("grid", showTripNav ? "grid-cols-5" : "grid-cols-4")}>
             {mobileItems.map((it) => (
               <NavLink
                 key={it.to}
