@@ -968,6 +968,34 @@ export const authService = {
       },
     });
   },
+  signInWithPassword: async (email: string, password: string) => {
+    return supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
+  },
+
+  signUpWithPassword: async (email: string, password: string) => {
+    return supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/trips` },
+    });
+  },
+
+  updatePassword: async (newPassword: string): Promise<void> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  },
+
+  sendPasswordReset: async (email: string): Promise<void> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: `${window.location.origin}/settings/seguranca` },
+    );
+    if (error) throw error;
+  },
+
   signOut: async () => {
     await supabase.auth.signOut();
   },
