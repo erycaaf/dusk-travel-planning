@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { tripsService } from "@/services";
 import type { Trip, User } from "@/lib/types";
 import { TripCard } from "@/components/TripCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Mail, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Trips() {
+  const nav = useNavigate();
   const [trips, setTrips] = useState<Trip[] | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteInput, setInviteInput] = useState("");
 
   useEffect(() => {
     tripsService
@@ -23,6 +28,18 @@ export default function Trips() {
 
   const memberObjs = (t: Trip) => t.members.map((m) => m.profile).filter(Boolean) as User[];
 
+  const handleInviteGo = () => {
+    const input = inviteInput.trim();
+    if (!input) return;
+    // aceita URL completa ou só o código
+    const code = input.includes("/invite/")
+      ? input.split("/invite/").pop()?.split("?")[0] ?? input
+      : input;
+    setInviteDialogOpen(false);
+    setInviteInput("");
+    nav(`/invite/${code}`);
+  };
+
   return (
     <div className="container max-w-6xl py-8 space-y-8">
       <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
@@ -31,7 +48,7 @@ export default function Trips() {
           <p className="text-muted-foreground mt-2">Suas viagens</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline"><Mail className="h-4 w-4" /> Entrar com convite</Button>
+          <Button variant="outline" onClick={() => setInviteDialogOpen(true)}><Mail className="h-4 w-4" /> Entrar com convite</Button>
           <Button asChild variant="sunset"><Link to="/trips/new"><Plus className="h-4 w-4" /> Nova viagem</Link></Button>
         </div>
       </header>
@@ -60,6 +77,30 @@ export default function Trips() {
           {trips.map((t) => <TripCard key={t.id} trip={t} members={memberObjs(t)} />)}
         </div>
       )}
+
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Entrar com convite</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">Cole o link ou o código de convite que você recebeu.</p>
+            <Input
+              placeholder="https://… ou código curto"
+              value={inviteInput}
+              onChange={(e) => setInviteInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleInviteGo()}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setInviteDialogOpen(false)}>Cancelar</Button>
+            <Button variant="sunset" onClick={handleInviteGo} disabled={!inviteInput.trim()}>
+              Ver convite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

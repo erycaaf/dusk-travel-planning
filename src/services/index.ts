@@ -744,6 +744,69 @@ export const packingService = {
   },
 };
 
+// === Invites ===
+export const invitesService = {
+  create: async (tripId: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+    const { data, error } = await supabase
+      .from("trip_invites")
+      .insert({ trip_id: tripId, created_by: user.id })
+      .select("code")
+      .single();
+    if (error) throw error;
+    return (data as { code: string }).code;
+  },
+
+  getByCode: async (code: string): Promise<{
+    tripId: string;
+    tripName: string;
+    tripCoverUrl: string;
+    tripCity: string;
+    tripCountry: string;
+  } | null> => {
+    const { data, error } = await supabase
+      .from("trip_invites")
+      .select("trip_id, trips(name, cover_url, city, country)")
+      .eq("code", code)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as { trip_id: string; trips: { name: string; cover_url: string | null; city: string; country: string } | null };
+    const t = row.trips;
+    return {
+      tripId: data.trip_id,
+      tripName: t?.name ?? "",
+      tripCoverUrl: resolveGalleryCover(t?.cover_url ?? null),
+      tripCity: t?.city ?? "",
+      tripCountry: t?.country ?? "",
+    };
+  },
+
+  accept: async (code: string): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Faça login primeiro.");
+
+    const { data: invite, error: e1 } = await supabase
+      .from("trip_invites")
+      .select("trip_id")
+      .eq("code", code)
+      .maybeSingle();
+    if (e1) throw e1;
+    if (!invite) throw new Error("Convite inválido ou expirado.");
+
+    const { error: e2 } = await supabase
+      .from("trip_members")
+      .insert({ trip_id: (invite as { trip_id: string }).trip_id, user_id: user.id, role: "editor" });
+    if (e2) {
+      if (e2.code === "23505") throw new Error("Você já é membro desta viagem.");
+      throw e2;
+    }
+
+    return (invite as { trip_id: string }).trip_id;
+  },
+};
+
 // === Feed ===
 type FeedRow = {
   id: string;
