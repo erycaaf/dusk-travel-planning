@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useParams, useLocation, useNavigate } from "react-router-dom";
-import { Home, MapPin, Calendar, Wallet, Backpack, Users, User, Settings, Hotel, Plane } from "lucide-react";
+import { Home, MapPin, Calendar, Wallet, Backpack, Users, User, Settings, Hotel, Plane, Shirt } from "lucide-react";
 import { DuskLogo } from "@/components/DuskLogo";
 import { cn } from "@/lib/utils";
 import { TravelerAvatarGroup } from "@/components/TravelerAvatarGroup";
