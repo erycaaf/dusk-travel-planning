@@ -5,9 +5,9 @@ import { toast } from "sonner";
 
 const items = [
   { to: "/profile", label: "Perfil", icon: User },
-  { to: "#", label: "Notificações", icon: Bell },
-  { to: "#", label: "Privacidade", icon: Lock },
-  { to: "#", label: "Idioma", icon: Languages },
+  { to: "/settings/notificacoes", label: "Notificações", icon: Bell },
+  { to: "/settings/privacidade", label: "Privacidade", icon: Lock },
+  { to: "/settings/idioma", label: "Idioma", icon: Languages },
   { to: "/settings/sobre", label: "Sobre o Dusk", icon: Info },
 ];
 

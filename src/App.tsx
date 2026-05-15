@@ -25,6 +25,9 @@ import Members from "./pages/trip/Members";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Sobre from "./pages/Sobre";
+import Notificacoes from "./pages/settings/Notificacoes";
+import Privacidade from "./pages/settings/Privacidade";
+import Idioma from "./pages/settings/Idioma";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +94,9 @@ const App = () => (
             <Route path="/profile" element={<Profile />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/sobre" element={<Sobre />} />
+            <Route path="/settings/notificacoes" element={<Notificacoes />} />
+            <Route path="/settings/privacidade" element={<Privacidade />} />
+            <Route path="/settings/idioma" element={<Idioma />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
