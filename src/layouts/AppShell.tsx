@@ -20,9 +20,10 @@ const tripNav = (tripId: string) => [
 ];
 
 const baseNav = [
-  { to: "/trips",    label: "Viagens", icon: MapPin, end: true },
-  { to: "/profile",  label: "Perfil",  icon: User },
-  { to: "/settings", label: "Ajustes", icon: Settings },
+  { to: "/trips",    label: "Viagens",      icon: MapPin, end: true },
+  { to: "/wardrobe", label: "Guarda-roupa", icon: Shirt },
+  { to: "/profile",  label: "Perfil",       icon: User },
+  { to: "/settings", label: "Ajustes",      icon: Settings },
 ];
 
 export function AppShell() {
